@@ -16,6 +16,7 @@ Amusement park management system built for COSC 3380 - Database Systems.
    ```
    cd backend && npm install
    cd ../frontend && npm install
+   (frontend) npm install react-router-dom
    ```
 4. Run the app (two terminals):
    ```
