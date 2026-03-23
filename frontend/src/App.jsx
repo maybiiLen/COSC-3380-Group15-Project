@@ -19,7 +19,7 @@ function Layout() {
   return (
     <div className="flex min-h-screen bg-white">
       <Sidebar />
-      <main>
+      <main className="flex-1 p-8 overflow-auto">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/rides" element={<Rides />} />

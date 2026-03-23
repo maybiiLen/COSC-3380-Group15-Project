@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 
+import logo from './assets/cougarride logo.png';
 import Home from './assets/home.svg';
 import Ride from './assets/ride.svg';
 import Staff from './assets/staff.svg'
@@ -65,10 +66,10 @@ export default function Sidebar() {
     return (
         <nav className="flex flex-col bg-[#E53E3E] p-4 h-screen">
             <div>
-            <div className="flex items-center font-bold text-2xl text-white">
-                🎢CougarRide
+            <div className="flex items-center">
+                <img src={logo} alt="CougarRide" className="h-10 w-auto brightness-0 invert" />
             </div>
-            <p className="text-white text-xs">Theme Park Management System</p>
+            <p className="text-white text-xs mt-1">Theme Park Experience</p>
             </div>
 
             <ul className="flex flex-col gap-5 py-4 text-xl font-medium">
