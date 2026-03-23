@@ -12,6 +12,7 @@ import Maintenance from './assets/maintenance.svg';
 import Analytics from './assets/analytics.svg';
 
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 
 const navList = [
     { label: "Home", icon: Home, path: "/" },
@@ -53,9 +54,11 @@ export default function Sidebar() {
     })
 
     const navigate = useNavigate()
+    const { logout } = useAuth()
 
-    function handleLogout() {
-        localStorage.removeItem("isLoggedIn")
+    async function handleLogout() {
+        await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        logout();
         navigate("/login")
     }
 
