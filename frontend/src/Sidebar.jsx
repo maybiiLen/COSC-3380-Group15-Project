@@ -64,10 +64,10 @@ export default function Sidebar() {
     }
 
     return (
-        <nav className="flex flex-col bg-[#E53E3E] p-4 h-screen">
+        <nav className="flex flex-col bg-[#C8102E] p-4">
             <div>
             <div className="flex items-center">
-                <img src={logo} alt="CougarRide" className="h-10 w-auto brightness-0 invert" />
+                <img src={logo} alt="CougarRide" className="h-10 w-auto" />
             </div>
             <p className="text-white text-xs mt-1">Theme Park Experience</p>
             </div>
