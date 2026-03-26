@@ -65,6 +65,81 @@ const migrations = [
       ALTER TABLE employees ALTER COLUMN full_name TYPE VARCHAR(255);
     `,
   },
+  {
+    name: "008_create_maintenance_requests",
+    sql: `
+      CREATE TABLE IF NOT EXISTS maintenance_requests (
+        request_id    SERIAL PRIMARY KEY,
+        ride_id       INTEGER NOT NULL REFERENCES rides(ride_id) ON DELETE CASCADE,
+        employee_id   INTEGER REFERENCES employees(employee_id) ON DELETE SET NULL,
+        description   TEXT NOT NULL,
+        priority      VARCHAR(20) NOT NULL DEFAULT 'Medium'
+                      CHECK (priority IN ('Low', 'Medium', 'High', 'Critical')),
+        status        VARCHAR(20) NOT NULL DEFAULT 'Pending'
+                      CHECK (status IN ('Pending', 'In Progress', 'Completed')),
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        completed_at  TIMESTAMPTZ
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_maintenance_ride_id ON maintenance_requests(ride_id);
+      CREATE INDEX IF NOT EXISTS idx_maintenance_status  ON maintenance_requests(status);
+    `,
+  },
+  {
+    name: "009_trigger_ride_status_on_maintenance",
+    sql: `
+      -- TRIGGER 1: Auto-update ride status based on maintenance request status
+      -- When a maintenance request is set to 'In Progress', the ride goes to 'Maintenance'
+      -- When all maintenance requests for a ride are 'Completed', the ride goes back to 'Operational'
+      CREATE OR REPLACE FUNCTION fn_update_ride_status_on_maintenance()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF NEW.status = 'In Progress' THEN
+          UPDATE rides SET status = 'Maintenance' WHERE ride_id = NEW.ride_id;
+        ELSIF NEW.status = 'Completed' THEN
+          -- Only set ride back to Operational if no other active requests exist
+          IF NOT EXISTS (
+            SELECT 1 FROM maintenance_requests
+            WHERE ride_id = NEW.ride_id
+              AND status IN ('Pending', 'In Progress')
+              AND request_id != NEW.request_id
+          ) THEN
+            UPDATE rides SET status = 'Operational' WHERE ride_id = NEW.ride_id;
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_ride_status_on_maintenance
+      AFTER INSERT OR UPDATE OF status ON maintenance_requests
+      FOR EACH ROW
+      EXECUTE FUNCTION fn_update_ride_status_on_maintenance();
+    `,
+  },
+  {
+    name: "010_trigger_auto_completed_at",
+    sql: `
+      -- TRIGGER 2: Auto-set completed_at timestamp when status changes to 'Completed'
+      -- Also clears completed_at if status is changed back from 'Completed'
+      CREATE OR REPLACE FUNCTION fn_auto_set_completed_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF NEW.status = 'Completed' AND (OLD IS NULL OR OLD.status != 'Completed') THEN
+          NEW.completed_at = NOW();
+        ELSIF NEW.status != 'Completed' THEN
+          NEW.completed_at = NULL;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_auto_completed_at
+      BEFORE INSERT OR UPDATE OF status ON maintenance_requests
+      FOR EACH ROW
+      EXECUTE FUNCTION fn_auto_set_completed_at();
+    `,
+  },
 ];
 
 const run = async () => {
