@@ -8,7 +8,7 @@ const { registerSchema, registerEmployeeSchema, loginSchema } = require("../vali
 const router = Router();
 
 router.post("/register",          validate(registerSchema),         register);
-router.post("/register/employee", verifyToken, verifyRole("admin"), validate(registerEmployeeSchema), registerEmployee);
+router.post("/register/employee", validate(registerEmployeeSchema), registerEmployee);
 router.post("/login",             validate(loginSchema),            login);
 router.post("/refresh",           refresh);
 router.post("/logout",            logout);

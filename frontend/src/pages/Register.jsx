@@ -10,6 +10,7 @@ export default function Register() {
     full_name: "",
     date_of_birth: "",
     phone: "",
+    role: "customer",
   });
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
@@ -28,11 +29,32 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/register", {
+      let endpoint, requestBody;
+
+      if (form.role === "customer") {
+        endpoint = "/api/auth/register";
+        requestBody = {
+          email: form.email,
+          password: form.password,
+          full_name: form.full_name,
+          date_of_birth: form.date_of_birth,
+          phone: form.phone,
+        };
+      } else {
+        endpoint = "/api/auth/register/employee";
+        requestBody = {
+          email: form.email,
+          password: form.password,
+          full_name: form.full_name,
+          role: form.role,
+        };
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(form),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await res.json();
@@ -79,9 +101,24 @@ export default function Register() {
       footerLinkText="Sign in"
     >
       <form onSubmit={handleRegister} className="flex flex-col gap-4">
-        {/* Name + Phone row */}
+        {/* Account Type */}
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Account Type</label>
+          <select
+            name="role"
+            value={form.role}
+            onChange={handleChange}
+            className={inputClass}
+          >
+            <option value="customer">Customer - Visit and enjoy the park</option>
+            <option value="staff">Staff - Work at the park</option>
+            <option value="manager">Manager - Manage park operations</option>
+          </select>
+        </div>
+
+        {/* Name + Phone row (Phone only for customers) */}
         <div className="flex gap-3">
-          <div className="flex flex-1 flex-col gap-1">
+          <div className={`flex ${form.role === "customer" ? "flex-1" : "w-full"} flex-col gap-1`}>
             <label className="text-sm font-medium text-gray-700">Full Name</label>
             <input
               type="text"
@@ -97,21 +134,23 @@ export default function Register() {
             )}
           </div>
 
-          <div className="flex flex-1 flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Phone</label>
-            <input
-              type="tel"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              placeholder="7135551234"
-              required
-              className={inputClass}
-            />
-            {fieldErrors.phone && (
-              <p className="text-xs text-red-500">{fieldErrors.phone[0]}</p>
-            )}
-          </div>
+          {form.role === "customer" && (
+            <div className="flex flex-1 flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">Phone</label>
+              <input
+                type="tel"
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder="7135551234"
+                required
+                className={inputClass}
+              />
+              {fieldErrors.phone && (
+                <p className="text-xs text-red-500">{fieldErrors.phone[0]}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Email */}
@@ -148,21 +187,23 @@ export default function Register() {
           )}
         </div>
 
-        {/* Date of Birth */}
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Date of Birth</label>
-          <input
-            type="date"
-            name="date_of_birth"
-            value={form.date_of_birth}
-            onChange={handleChange}
-            required
-            className={inputClass}
-          />
-          {fieldErrors.date_of_birth && (
-            <p className="text-xs text-red-500">{fieldErrors.date_of_birth[0]}</p>
-          )}
-        </div>
+        {/* Date of Birth (only for customers) */}
+        {form.role === "customer" && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Date of Birth</label>
+            <input
+              type="date"
+              name="date_of_birth"
+              value={form.date_of_birth}
+              onChange={handleChange}
+              required
+              className={inputClass}
+            />
+            {fieldErrors.date_of_birth && (
+              <p className="text-xs text-red-500">{fieldErrors.date_of_birth[0]}</p>
+            )}
+          </div>
+        )}
 
         {error && (
           <p className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>
