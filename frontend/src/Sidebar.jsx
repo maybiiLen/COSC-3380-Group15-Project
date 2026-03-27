@@ -16,15 +16,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
 const navList = [
-    { label: "Home", icon: Home, path: "/" },
-    { label: "Rides", icon: Ride, path: "/rides" },
-    { label: "Staff", icon: Staff, path: "/staff" },
-    { label: "Tickets", icon: Ticket, path: "/tickets" },
-    { label: "Restaurant", icon: Food, path: "/restaurant"  },
-    { label: "Gift Shop", icon: Gift, path: "/gift-shop" },
-    { label: "Merchandise", icon: Merch, path: "/merchandise" },
-    { label: "Maintenance", icon: Maintenance, path: "/maintenance" },
-    { label: "Analytics", icon: Analytics, path: "/analytics" },
+    { label: "Home", icon: Home, path: "/", roles: ["customer", "staff", "manager", "admin"] },
+    { label: "Rides", icon: Ride, path: "/rides", roles: ["customer", "staff", "manager", "admin"] },
+    { label: "Staff", icon: Staff, path: "/staff", roles: ["manager", "admin"] },
+    { label: "Tickets", icon: Ticket, path: "/tickets", roles: ["customer", "staff", "manager", "admin"] },
+    { label: "Restaurant", icon: Food, path: "/restaurant", roles: ["customer", "staff", "manager", "admin"] },
+    { label: "Gift Shop", icon: Gift, path: "/gift-shop", roles: ["customer", "staff", "manager", "admin"] },
+    { label: "Merchandise", icon: Merch, path: "/merchandise", roles: ["staff", "manager", "admin"] },
+    { label: "Maintenance", icon: Maintenance, path: "/maintenance", roles: ["staff", "manager", "admin"] },
+    { label: "Analytics", icon: Analytics, path: "/analytics", roles: ["manager", "admin"] },
 ]
 
 const baseCase = "flex items-center gap-1.5 cursor-pointer text-white"
@@ -55,7 +55,7 @@ export default function Sidebar() {
     })
 
     const navigate = useNavigate()
-    const { logout } = useAuth()
+    const { user, logout } = useAuth()
 
     async function handleLogout() {
         await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -73,19 +73,21 @@ export default function Sidebar() {
             </div>
 
             <ul className="flex flex-col gap-5 py-4 text-xl font-medium">
-                {navList.map((item) => (
-                    <li key={item.label}>
-                        <NavLink
-                            to={item.path}
-                            className={({ isActive }) =>
-                                `${baseCase} ${isActive ? activeCase : inactiveCase}`
-                            }
-                        >
-                        <img src={item.icon} alt={item.label} className="w-5 h-5 filter brightness-0 invert" />
-                        {item.label}
-                        </NavLink>
-                    </li>
-                ))}
+                {navList
+                    .filter((item) => user?.role && item.roles.includes(user.role))
+                    .map((item) => (
+                        <li key={item.label}>
+                            <NavLink
+                                to={item.path}
+                                className={({ isActive }) =>
+                                    `${baseCase} ${isActive ? activeCase : inactiveCase}`
+                                }
+                            >
+                            <img src={item.icon} alt={item.label} className="w-5 h-5 filter brightness-0 invert" />
+                            {item.label}
+                            </NavLink>
+                        </li>
+                    ))}
             </ul>
 
             <div className='flex flex-col mt-auto items-center gap-1 text-white'>

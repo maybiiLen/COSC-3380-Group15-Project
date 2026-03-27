@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import Search from "../assets/search.svg"
+import { useAuth } from "../context/AuthContext"
 
 export default function Rides() {
   const [rides, setRides] = useState([])
@@ -9,6 +10,7 @@ export default function Rides() {
   const [status, setStatus] = useState("All Status")
   const [search, setSearch] = useState("")
   const [isOpen, setIsOpen] = useState(false)
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
     name: "",
     capacity: "",
@@ -128,18 +130,20 @@ export default function Rides() {
             <option value="Closed">Closed</option>
           </select>
         </div>
-        <div className="flex">
-          <button
-            className="flex items-center justify-center gap-1 border border-gray-900/40 rounded-lg bg-[#C8102E] text-white px-3 py-2 hover:bg-[#C8102E]/80 cursor-pointer"
-            onClick={() => setIsOpen(true)}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-              <path d="M5 12h14" />
-              <path d="M12 5v14" />
-            </svg>
-            Add Ride
-          </button>
-        </div>
+        {["staff", "manager", "admin"].includes(user?.role) && (
+          <div className="flex">
+            <button
+              className="flex items-center justify-center gap-1 border border-gray-900/40 rounded-lg bg-[#C8102E] text-white px-3 py-2 hover:bg-[#C8102E]/80 cursor-pointer"
+              onClick={() => setIsOpen(true)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <path d="M5 12h14" />
+                <path d="M12 5v14" />
+              </svg>
+              Add Ride
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -246,23 +250,25 @@ export default function Rides() {
             <th className="px-10 py-3 text-left font-medium text-gray-500">Location</th>
             <th className="px-10 py-3 text-left font-medium text-gray-500">Wait Time</th>
             <th className="px-10 py-3 text-left font-medium text-gray-500">Status</th>
-            <th className="px-10 py-3 text-left font-medium text-gray-500">Actions</th>
+{["staff", "manager", "admin"].includes(user?.role) && (
+              <th className="px-10 py-3 text-left font-medium text-gray-500">Actions</th>
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {loading && (
             <tr>
-              <td colSpan="8" className="px-10 py-6 text-center text-gray-400">Loading rides...</td>
+              <td colSpan={["staff", "manager", "admin"].includes(user?.role) ? "8" : "7"} className="px-10 py-6 text-center text-gray-400">Loading rides...</td>
             </tr>
           )}
           {error && (
             <tr>
-              <td colSpan="8" className="px-10 py-6 text-center text-red-400">{error}</td>
+              <td colSpan={["staff", "manager", "admin"].includes(user?.role) ? "8" : "7"} className="px-10 py-6 text-center text-red-400">{error}</td>
             </tr>
           )}
           {filteredRides.length === 0 && !loading && (
             <tr>
-              <td colSpan="8" className="px-10 py-6 text-center text-gray-400">No rides found</td>
+              <td colSpan={["staff", "manager", "admin"].includes(user?.role) ? "8" : "7"} className="px-10 py-6 text-center text-gray-400">No rides found</td>
             </tr>
           )}
           {filteredRides.map((ride) => (
@@ -282,13 +288,15 @@ export default function Rides() {
                   {ride.status}
                 </span>
               </td>
-              <td className="px-10 py-3">
-                <button onClick={() => setDeleteId(ride.ride_id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors cursor-pointer">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                  </svg>
-                </button>
-              </td>
+              {["staff", "manager", "admin"].includes(user?.role) && (
+                <td className="px-10 py-3">
+                  <button onClick={() => setDeleteId(ride.ride_id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 713.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
