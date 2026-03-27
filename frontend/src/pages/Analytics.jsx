@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { API_BASE_URL } from '../utils/api'
 
 export default function Analytics() {
   const { user } = useAuth()
@@ -28,7 +29,7 @@ export default function Analytics() {
 
   async function fetchRides() {
     try {
-      const res = await fetch('/api/rides')
+      const res = await fetch(`${API_BASE_URL}/api/rides`)
       const data = await res.json()
       setRides(data)
     } catch (err) {
@@ -41,7 +42,7 @@ export default function Analytics() {
     setError('')
 
     try {
-      let url = `/api/reports/${activeTab === 'maintenance' ? 'maintenance' : activeTab === 'rideUsage' ? 'ride-usage' : 'ticket-sales'}`
+      let url = `${API_BASE_URL}/api/reports/${activeTab === 'maintenance' ? 'maintenance' : activeTab === 'rideUsage' ? 'ride-usage' : 'ticket-sales'}`
       const params = new URLSearchParams()
 
       Object.entries(filters[activeTab]).forEach(([key, value]) => {
@@ -69,7 +70,7 @@ export default function Analytics() {
 
   async function exportToCSV() {
     try {
-      let url = `/api/reports/${activeTab === 'maintenance' ? 'maintenance' : activeTab === 'rideUsage' ? 'ride-usage' : 'ticket-sales'}`
+      let url = `${API_BASE_URL}/api/reports/${activeTab === 'maintenance' ? 'maintenance' : activeTab === 'rideUsage' ? 'ride-usage' : 'ticket-sales'}`
       const params = new URLSearchParams()
 
       Object.entries(filters[activeTab]).forEach(([key, value]) => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import Search from "../assets/search.svg"
 import { useAuth } from "../context/AuthContext"
+import { API_BASE_URL } from "../utils/api"
 
 export default function Maintenance() {
   const [requests, setRequests] = useState([])
@@ -30,7 +31,7 @@ export default function Maintenance() {
 
   async function fetchRequests() {
     try {
-      const res = await fetch("/api/maintenance")
+      const res = await fetch(`${API_BASE_URL}/api/maintenance`)
       const data = await res.json()
       setRequests(data)
     } catch (err) {
@@ -42,7 +43,7 @@ export default function Maintenance() {
 
   async function fetchRides() {
     try {
-      const res = await fetch("/api/rides")
+      const res = await fetch(`${API_BASE_URL}/api/rides`)
       const data = await res.json()
       setRides(data)
     } catch (err) {
@@ -52,7 +53,7 @@ export default function Maintenance() {
 
   async function fetchEmployees() {
     try {
-      const res = await fetch("/api/employees")
+      const res = await fetch(`${API_BASE_URL}/api/employees`)
       const data = await res.json()
       setEmployees(data)
     } catch (err) {
@@ -85,7 +86,7 @@ export default function Maintenance() {
   async function handleSubmit() {
     try {
       if (editId) {
-        const res = await fetch(`/api/maintenance/${editId}`, {
+        const res = await fetch(`${API_BASE_URL}/api/maintenance/${editId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData)
@@ -96,7 +97,7 @@ export default function Maintenance() {
           return
         }
       } else {
-        const res = await fetch("/api/maintenance", {
+        const res = await fetch(`${API_BASE_URL}/api/maintenance`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData)
@@ -120,7 +121,7 @@ export default function Maintenance() {
 
   async function handleDelete() {
     try {
-      const res = await fetch(`/api/maintenance/${deleteId}`, { method: "DELETE" })
+      const res = await fetch(`${API_BASE_URL}/api/maintenance/${deleteId}`, { method: "DELETE" })
       if (!res.ok) {
         const data = await res.json()
         alert(data.message || "Failed to delete request")

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthLayout from "../components/AuthLayout";
+import { API_BASE_URL } from "../utils/api";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -32,7 +33,7 @@ export default function Register() {
       let endpoint, requestBody;
 
       if (form.role === "customer") {
-        endpoint = "/api/auth/register";
+        endpoint = `${API_BASE_URL}/api/auth/register`;
         requestBody = {
           email: form.email,
           password: form.password,
@@ -41,7 +42,7 @@ export default function Register() {
           phone: form.phone,
         };
       } else {
-        endpoint = "/api/auth/register/employee";
+        endpoint = `${API_BASE_URL}/api/auth/register/employee`;
         requestBody = {
           email: form.email,
           password: form.password,
@@ -68,7 +69,7 @@ export default function Register() {
         return;
       }
 
-      const loginRes = await fetch("/api/auth/login", {
+      const loginRes = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
