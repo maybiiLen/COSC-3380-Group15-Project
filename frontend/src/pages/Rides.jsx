@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import Search from "../assets/search.svg"
 import { useAuth } from "../context/AuthContext"
+import { API_BASE_URL } from "../utils/api"
 
 export default function Rides() {
   const [rides, setRides] = useState([])
@@ -22,7 +23,7 @@ export default function Rides() {
   useEffect(() => {
     async function fetchRides() {
       try {
-        const res = await fetch("/api/rides")
+        const res = await fetch(`${API_BASE_URL}/api/rides`)
         const data = await res.json()
         console.log("Rides data:", data)
         setRides(data)
@@ -42,7 +43,7 @@ export default function Rides() {
 
   async function handleSubmit() {
     try {
-      const res = await fetch("/api/rides", {
+      const res = await fetch(`${API_BASE_URL}/api/rides`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -77,7 +78,7 @@ export default function Rides() {
 
   async function handleDelete() {
     try {
-      const res = await fetch(`/api/rides/${deleteId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/rides/${deleteId}`, {
         method: "DELETE"
       })
 

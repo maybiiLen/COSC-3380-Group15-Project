@@ -14,6 +14,7 @@ import Analytics from './assets/analytics.svg';
 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { API_BASE_URL } from './utils/api';
 
 const navList = [
     { label: "Home", icon: Home, path: "/", roles: ["customer", "staff", "manager", "admin"] },
@@ -58,7 +59,7 @@ export default function Sidebar() {
     const { user, logout } = useAuth()
 
     async function handleLogout() {
-        await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        await fetch(`${API_BASE_URL}/api/auth/logout`, { method: "POST", credentials: "include" });
         logout();
         navigate("/login")
     }
