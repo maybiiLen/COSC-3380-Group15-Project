@@ -227,63 +227,51 @@ router.get("/ride-usage", async (req, res) => {
   }
 })
 
-// ─── REPORT 3: Ticket Sales Summary (Mock Data for Demo) ───
+// ─── REPORT 3: Ticket Sales (REAL data from ticket_purchases) ───
 router.get("/ticket-sales", async (req, res) => {
-  const { start_date, end_date, format } = req.query
+  const { ticket_type, start_date, end_date, format } = req.query
+
+  let conditions = []
+  let params = []
+  let idx = 1
+
+  if (ticket_type && ticket_type !== '') { conditions.push(`tp.ticket_type = $${idx++}`); params.push(ticket_type) }
+  if (start_date && start_date !== '') { conditions.push(`tp.purchase_date >= $${idx++}`); params.push(start_date) }
+  if (end_date && end_date !== '') { conditions.push(`tp.purchase_date <= $${idx++}`); params.push(end_date + "T23:59:59") }
+
+  const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : ""
 
   try {
-    // Enhanced mock data with additional computed fields
+    // By ticket type (subtotals)
     const { rows: byType } = await pool.query(`
-      WITH ticket_data AS (
-        SELECT 'General Admission' AS ticket_type, 35.00 AS type_price, 125 AS tickets_sold, 8.5 AS avg_park_hours
-        UNION ALL
-        SELECT 'VIP Pass' AS ticket_type, 75.00 AS type_price, 45 AS tickets_sold, 12.2 AS avg_park_hours
-        UNION ALL
-        SELECT 'Season Pass' AS ticket_type, 199.99 AS type_price, 78 AS tickets_sold, 6.8 AS avg_park_hours
-        UNION ALL
-        SELECT 'Student Discount' AS ticket_type, 25.00 AS type_price, 89 AS tickets_sold, 9.1 AS avg_park_hours
-      ),
-      revenue_totals AS (
-        SELECT SUM(tickets_sold * type_price) AS total_revenue FROM ticket_data
-      )
       SELECT
-        td.ticket_type,
-        td.type_price AS price,
-        td.tickets_sold,
-        (td.tickets_sold * td.type_price) AS subtotal_revenue,
-        ROUND(100.0 * (td.tickets_sold * td.type_price) / NULLIF(rt.total_revenue, 0), 1) AS revenue_share_pct,
-        (td.tickets_sold - 5) AS distinct_customers,
-        td.avg_park_hours,
-        ROUND((td.tickets_sold * td.avg_park_hours)::numeric, 1) AS total_park_hours,
-        CURRENT_DATE - INTERVAL '30 days' AS purchase_date,
-        CURRENT_DATE AS valid_until,
-        false AS is_used
-      FROM ticket_data td
-      CROSS JOIN revenue_totals rt
+        tp.ticket_type,
+        tp.unit_price_adult AS price,
+        SUM(tp.adult_qty + tp.child_qty) AS tickets_sold,
+        SUM(tp.total_price) AS subtotal_revenue,
+        ROUND(100.0 * SUM(tp.total_price) / NULLIF((SELECT SUM(total_price) FROM ticket_purchases), 0), 1) AS revenue_share_pct,
+        COUNT(DISTINCT tp.user_id) AS distinct_customers,
+        COUNT(tp.purchase_id) AS total_transactions,
+        ROUND(AVG(tp.total_price)::numeric, 2) AS avg_transaction
+      FROM ticket_purchases tp
+      ${where}
+      GROUP BY tp.ticket_type, tp.unit_price_adult
       ORDER BY subtotal_revenue DESC
-    `)
+    `, params)
 
-    // Get grand totals
+    // Grand totals
     const { rows: totals } = await pool.query(`
-      WITH ticket_data AS (
-        SELECT 'General Admission' AS ticket_type, 35.00 AS type_price, 125 AS tickets_sold, 8.5 AS avg_park_hours
-        UNION ALL
-        SELECT 'VIP Pass' AS ticket_type, 75.00 AS type_price, 45 AS tickets_sold, 12.2 AS avg_park_hours
-        UNION ALL
-        SELECT 'Season Pass' AS ticket_type, 199.99 AS type_price, 78 AS tickets_sold, 6.8 AS avg_park_hours
-        UNION ALL
-        SELECT 'Student Discount' AS ticket_type, 25.00 AS type_price, 89 AS tickets_sold, 9.1 AS avg_park_hours
-      )
       SELECT
-        SUM(td.tickets_sold) AS total_tickets,
-        SUM(td.tickets_sold * td.type_price) AS total_revenue,
-        ROUND(AVG(td.type_price)::numeric, 2) AS avg_price,
-        MIN(td.type_price) AS min_price,
-        MAX(td.type_price) AS max_price,
-        SUM(td.tickets_sold - 5) AS distinct_customers,
-        ROUND(SUM(td.tickets_sold * td.avg_park_hours)::numeric, 1) AS total_park_hours
-      FROM ticket_data td
-    `)
+        SUM(tp.adult_qty + tp.child_qty) AS total_tickets,
+        SUM(tp.total_price) AS total_revenue,
+        ROUND(AVG(tp.total_price)::numeric, 2) AS avg_price,
+        MIN(tp.total_price) AS min_price,
+        MAX(tp.total_price) AS max_price,
+        COUNT(DISTINCT tp.user_id) AS distinct_customers,
+        COUNT(tp.purchase_id) AS total_transactions
+      FROM ticket_purchases tp
+      ${where}
+    `, params)
 
     if (format === 'csv') {
       const csvHeaders = 'Ticket Type,Price,Tickets Sold,Revenue,Revenue Share %\n'

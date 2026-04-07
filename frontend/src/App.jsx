@@ -1,8 +1,9 @@
-import Login from "./pages/Login";
-import Register from "./pages/Register";
+import AuthPage from "./pages/AuthPage";
 import Sidebar from "./Sidebar";
 import ProtectedRoute from "./pages/ProtectedRoute";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import CustomerLanding from "./pages/CustomerLanding";
+import TicketShop from "./pages/TicketShop";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 
 import Home from "./pages/Home";
@@ -15,7 +16,7 @@ import Merchandise from "./pages/Merchandise";
 import Maintenance from "./pages/Maintenance";
 import Analytics from "./pages/Analytics";
 
-function Layout() {
+function DashboardLayout() {
   return (
     <div className="flex min-h-screen bg-white">
       <Sidebar />
@@ -41,13 +42,16 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/" element={<CustomerLanding />} />
+          <Route path="/tickets" element={<TicketShop />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/login" element={<Navigate to="/auth" replace />} />
+          <Route path="/register" element={<Navigate to="/auth" replace />} />
           <Route
-            path="/*"
+            path="/dashboard/*"
             element={
               <ProtectedRoute>
-                <Layout />
+                <DashboardLayout />
               </ProtectedRoute>
             }
           />

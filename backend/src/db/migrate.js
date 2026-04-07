@@ -140,6 +140,43 @@ const migrations = [
       EXECUTE FUNCTION fn_auto_set_completed_at();
     `,
   },
+  {
+    name: "011_add_is_operational_to_rides",
+    sql: `
+      ALTER TABLE rides ADD COLUMN IF NOT EXISTS is_operational BOOLEAN NOT NULL DEFAULT true;
+      -- Mark rides with status 'Closed' as non-operational
+      UPDATE rides SET is_operational = false WHERE status = 'Closed';
+    `,
+  },
+  {
+    name: "012_create_ticket_purchases",
+    sql: `
+      CREATE TABLE IF NOT EXISTS ticket_purchases (
+        purchase_id    SERIAL PRIMARY KEY,
+        customer_id    INTEGER REFERENCES customers(customer_id) ON DELETE SET NULL,
+        user_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        ticket_type    VARCHAR(50) NOT NULL,
+        adult_qty      INTEGER NOT NULL DEFAULT 0,
+        child_qty      INTEGER NOT NULL DEFAULT 0,
+        unit_price_adult  NUMERIC(10,2) NOT NULL,
+        unit_price_child  NUMERIC(10,2) NOT NULL,
+        total_price    NUMERIC(10,2) NOT NULL,
+        visit_date     DATE,
+        purchase_date  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ticket_purchases_user_id ON ticket_purchases(user_id);
+      CREATE INDEX IF NOT EXISTS idx_ticket_purchases_customer_id ON ticket_purchases(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_ticket_purchases_date ON ticket_purchases(purchase_date);
+    `,
+  },
+  {
+    name: "013_add_card_details_to_purchases",
+    sql: `
+      ALTER TABLE ticket_purchases ADD COLUMN IF NOT EXISTS card_last_four VARCHAR(4);
+      ALTER TABLE ticket_purchases ADD COLUMN IF NOT EXISTS cardholder_name VARCHAR(255);
+    `,
+  },
 ];
 
 const run = async () => {

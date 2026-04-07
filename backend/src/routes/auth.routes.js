@@ -7,10 +7,24 @@ const { registerSchema, registerEmployeeSchema, loginSchema } = require("../vali
 
 const router = Router();
 
-router.post("/register",          validate(registerSchema),         register);
-router.post("/register/employee", validate(registerEmployeeSchema), registerEmployee);
-router.post("/login",             validate(loginSchema),            login);
-router.post("/refresh",           refresh);
-router.post("/logout",            logout);
+// Check if email exists (for Disney-style auth flow)
+router.post("/check-email", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: "Email is required" });
+
+  const pool = require("../config/db");
+  const { rows } = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+  res.json({ exists: rows.length > 0 });
+});
+
+// Public — customer self-registration (always role='customer')
+router.post("/register", validate(registerSchema), register);
+
+// Admin only — create staff/manager/admin accounts
+router.post("/register/employee", verifyToken, verifyRole("admin"), validate(registerEmployeeSchema), registerEmployee);
+
+router.post("/login",   validate(loginSchema), login);
+router.post("/refresh", refresh);
+router.post("/logout",  logout);
 
 module.exports = router;

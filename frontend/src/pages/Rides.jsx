@@ -11,7 +11,9 @@ export default function Rides() {
   const [status, setStatus] = useState("All Status")
   const [search, setSearch] = useState("")
   const [isOpen, setIsOpen] = useState(false)
+  const [editRide, setEditRide] = useState(null) // ride object being edited
   const { user } = useAuth()
+  const canCRUD = ["manager", "admin"].includes(user?.role)
   const [formData, setFormData] = useState({
     name: "",
     capacity: "",
@@ -23,7 +25,7 @@ export default function Rides() {
   useEffect(() => {
     async function fetchRides() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/rides`)
+        const res = await fetch(`${API_BASE_URL}/api/rides?all=true`)
         const data = await res.json()
         console.log("Rides data:", data)
         setRides(data)
@@ -89,11 +91,50 @@ export default function Rides() {
         return
       }
 
-      setRides(rides.filter((ride) => ride.ride_id !== Number(deleteId)))
+      setRides(rides.map((ride) =>
+        ride.ride_id === Number(deleteId)
+          ? { ...ride, is_operational: false, status: "Decommissioned" }
+          : ride
+      ))
       setDeleteId(null)
 
     } catch (err) {
       console.log("Delete error:", err)
+    }
+  }
+
+  function openEdit(ride) {
+    setEditRide(ride)
+    setFormData({
+      name: ride.ride_name,
+      capacity: ride.capacity_per_cycle,
+      minHeight: ride.min_height_in,
+      location: ride.location,
+      status: ride.status,
+    })
+  }
+
+  async function handleEdit() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/rides/${editRide.ride_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ride_name: formData.name,
+          capacity_per_cycle: Number(formData.capacity),
+          min_height_in: Number(formData.minHeight),
+          location: formData.location,
+          status: formData.status,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data.message || "Failed to update ride"); return }
+
+      setRides(rides.map(r => r.ride_id === editRide.ride_id ? data : r))
+      setEditRide(null)
+      setFormData({ name: "", capacity: "", minHeight: "", location: "", status: "Operational" })
+    } catch (err) {
+      console.log("Edit error:", err)
     }
   }
 
@@ -131,7 +172,7 @@ export default function Rides() {
             <option value="Closed">Closed</option>
           </select>
         </div>
-        {["staff", "manager", "admin"].includes(user?.role) && (
+        {canCRUD && (
           <div className="flex">
             <button
               className="flex items-center justify-center gap-1 border border-gray-900/40 rounded-lg bg-[#C8102E] text-white px-3 py-2 hover:bg-[#C8102E]/80 cursor-pointer"
@@ -240,6 +281,68 @@ export default function Rides() {
         </div>
       )}
 
+      {/* Edit Ride Modal */}
+      {editRide && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md flex flex-col gap-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="font-bold text-xl text-gray-900">Edit Ride</h1>
+                <p className="text-sm text-gray-500">Update details for {editRide.ride_name}</p>
+              </div>
+              <button onClick={() => setEditRide(null)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg cursor-pointer transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col gap-1.5 font-medium text-gray-700">
+              Ride Name
+              <input type="text" name="name" className="border border-gray-400 rounded-lg px-3 py-2.5 focus:border-[#C8102E] focus:ring-2 focus:ring-[#C8102E]/20 outline-none font-normal" value={formData.name} onChange={handleChange} />
+            </div>
+            <div className="flex gap-4 font-medium text-gray-700">
+              <div className="flex flex-col gap-1.5 flex-1">
+                Capacity
+                <input type="number" name="capacity" className="border border-gray-400 rounded-lg px-3 py-2.5 focus:border-[#C8102E] focus:ring-2 focus:ring-[#C8102E]/20 outline-none w-full font-normal" value={formData.capacity} onChange={handleChange} />
+              </div>
+              <div className="flex flex-col gap-1.5 flex-1">
+                Min Height (in)
+                <input type="number" name="minHeight" className="border border-gray-400 rounded-lg px-3 py-2.5 focus:border-[#C8102E] focus:ring-2 focus:ring-[#C8102E]/20 outline-none w-full font-normal" value={formData.minHeight} onChange={handleChange} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5 font-medium text-gray-700">
+              Location
+              <input type="text" name="location" className="border border-gray-400 rounded-lg px-3 py-2.5 focus:border-[#C8102E] focus:ring-2 focus:ring-[#C8102E]/20 outline-none font-normal" value={formData.location} onChange={handleChange} />
+            </div>
+            <div className="flex items-center gap-3 font-medium text-gray-700">
+              Status
+              <div className="border border-gray-300 rounded-lg overflow-hidden">
+                <select name="status" value={formData.status} onChange={handleChange} className={`outline-none px-3 py-2 font-medium cursor-pointer
+                  ${formData.status === "Operational" ? "bg-green-600 text-white" : ""}
+                  ${formData.status === "Maintenance" ? "bg-yellow-600 text-white" : ""}
+                  ${formData.status === "Closed"      ? "bg-red-600 text-white"   : ""}
+                  ${formData.status === "Decommissioned" ? "bg-gray-600 text-white" : ""}
+                `}>
+                  <option value="Operational">Operational</option>
+                  <option value="Maintenance">Maintenance</option>
+                  <option value="Closed">Closed</option>
+                  <option value="Decommissioned">Decommissioned</option>
+                </select>
+              </div>
+            </div>
+            <div className="border-t border-gray-200" />
+            <div className="flex justify-center gap-10">
+              <button className="border px-10 rounded-xl p-2 font-medium bg-[#C8102E] text-white shadow-lg hover:bg-[#C8102E]/80 cursor-pointer transition-colors" onClick={handleEdit}>
+                Save Changes
+              </button>
+              <button className="border px-10 rounded-xl p-2 font-medium bg-black text-white shadow-lg hover:bg-black/80 cursor-pointer transition-colors" onClick={() => setEditRide(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <table className="w-full text-sm mt-6">
         <thead className="bg-gray-50 border-b border-gray-200">
@@ -251,7 +354,7 @@ export default function Rides() {
             <th className="px-10 py-3 text-left font-medium text-gray-500">Location</th>
             <th className="px-10 py-3 text-left font-medium text-gray-500">Wait Time</th>
             <th className="px-10 py-3 text-left font-medium text-gray-500">Status</th>
-{["staff", "manager", "admin"].includes(user?.role) && (
+{canCRUD && (
               <th className="px-10 py-3 text-left font-medium text-gray-500">Actions</th>
             )}
           </tr>
@@ -259,17 +362,17 @@ export default function Rides() {
         <tbody className="divide-y divide-gray-100">
           {loading && (
             <tr>
-              <td colSpan={["staff", "manager", "admin"].includes(user?.role) ? "8" : "7"} className="px-10 py-6 text-center text-gray-400">Loading rides...</td>
+              <td colSpan={canCRUD ? "8" : "7"} className="px-10 py-6 text-center text-gray-400">Loading rides...</td>
             </tr>
           )}
           {error && (
             <tr>
-              <td colSpan={["staff", "manager", "admin"].includes(user?.role) ? "8" : "7"} className="px-10 py-6 text-center text-red-400">{error}</td>
+              <td colSpan={canCRUD ? "8" : "7"} className="px-10 py-6 text-center text-red-400">{error}</td>
             </tr>
           )}
           {filteredRides.length === 0 && !loading && (
             <tr>
-              <td colSpan={["staff", "manager", "admin"].includes(user?.role) ? "8" : "7"} className="px-10 py-6 text-center text-gray-400">No rides found</td>
+              <td colSpan={canCRUD ? "8" : "7"} className="px-10 py-6 text-center text-gray-400">No rides found</td>
             </tr>
           )}
           {filteredRides.map((ride) => (
@@ -289,13 +392,20 @@ export default function Rides() {
                   {ride.status}
                 </span>
               </td>
-              {["staff", "manager", "admin"].includes(user?.role) && (
+              {canCRUD && (
                 <td className="px-10 py-3">
-                  <button onClick={() => setDeleteId(ride.ride_id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 713.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                    </svg>
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => openEdit(ride)} className="text-blue-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors cursor-pointer" title="Edit">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                      </svg>
+                    </button>
+                    <button onClick={() => setDeleteId(ride.ride_id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors cursor-pointer" title="Decommission">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               )}
             </tr>

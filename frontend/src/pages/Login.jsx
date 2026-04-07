@@ -33,7 +33,12 @@ export default function Login() {
       }
 
       login(data.accessToken, data.user);
-      navigate("/");
+      // Staff/manager/admin go to dashboard, customers go to landing page
+      if (["staff", "manager", "admin"].includes(data.user.role)) {
+        navigate("/dashboard");
+      } else {
+        navigate("/");
+      }
     } catch {
       setError("Could not connect to server");
     } finally {
@@ -89,3 +94,4 @@ export default function Login() {
     </AuthLayout>
   );
 }
+
