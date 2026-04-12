@@ -5,121 +5,89 @@ import CustomerFooter from "../components/CustomerFooter"
 
 const f = "'DM Sans', sans-serif"
 const fh = "var(--font-heading)"
-const foodIcons = { "American": "🍔", "Asian": "🍜", "Italian": "🍕", "BBQ": "🥩", "Snacks & Drinks": "🍿", "Mexican": "🌮" }
+const FALLBACK = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800"
 
 export default function DiningPage() {
   const [restaurants, setRestaurants] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState("all")
+  const [filter, setFilter] = useState("All")
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/park-ops/restaurants`)
       .then(r => r.json())
-      .then(data => { setRestaurants(Array.isArray(data) ? data : []); setLoading(false) })
+      .then(d => { setRestaurants(Array.isArray(d) ? d : []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
+  const foodTypes = ["All", ...new Set(restaurants.map(r => r.food_type).filter(Boolean))]
+  const filtered = filter === "All" ? restaurants : restaurants.filter(r => r.food_type === filter)
   const openCount = restaurants.filter(r => r.operational_status === 1).length
-  const cuisineTypes = [...new Set(restaurants.map(r => r.food_type).filter(Boolean))]
-  const filtered = filter === "all" ? restaurants : filter === "open" ? restaurants.filter(r => r.operational_status === 1) : restaurants.filter(r => r.food_type === filter)
 
   return (
-    <div style={{ background: "var(--cr-bg)", minHeight: "100vh" }}>
+    <div style={{ background: "#ffffff", minHeight: "100vh" }}>
+      <style>{`@keyframes fadeInUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }`}</style>
       <CustomerNav />
-
-      {/* Hero */}
-      <div style={{
-        paddingTop: "94px",
-        background: "linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #0F0E0E 100%)",
-        padding: "140px 2rem 4rem", textAlign: "center",
-        position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 70% 0%, rgba(76,175,80,0.15) 0%, transparent 60%)" }} />
-        <div style={{ position: "relative", zIndex: 1 }}>
-          <span style={{ fontFamily: f, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "3px", textTransform: "uppercase", color: "#81C784" }}>Dining & Refreshments</span>
-          <h1 style={{ fontFamily: fh, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "white", margin: "0.5rem 0 0.75rem" }}>Fuel Your Adventure</h1>
-          <p style={{ fontFamily: f, fontSize: "0.95rem", color: "rgba(255,255,255,0.6)", maxWidth: "550px", margin: "0 auto" }}>
-            From quick bites to sit-down meals — {restaurants.length} dining locations with {openCount} currently open.
+      <div style={{ paddingTop: "94px" }}>
+        <div style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32, #4CAF50)", padding: "4rem 2rem", textAlign: "center" }}>
+          <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>🍔</div>
+          <h1 style={{ fontFamily: fh, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "white", margin: "0 0 0.75rem" }}>Dining & Refreshments</h1>
+          <p style={{ fontFamily: f, fontSize: "1rem", color: "rgba(255,255,255,0.85)", maxWidth: "600px", margin: "0 auto" }}>
+            {restaurants.length} dining locations · {openCount} currently open · Mobile ordering at select locations
           </p>
         </div>
-      </div>
 
-      {/* Stats */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "3rem", padding: "2rem", flexWrap: "wrap" }}>
-        {[
-          { value: restaurants.length, label: "Total Locations", color: "white" },
-          { value: openCount, label: "Open Now", color: "#4CAF50" },
-          { value: restaurants.length - openCount, label: "Closed", color: "#F44336" },
-        ].map((s, i) => (
-          <div key={i} style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: fh, fontSize: "2rem", fontWeight: 800, color: s.color }}>{s.value}</div>
-            <div style={{ fontFamily: f, fontSize: "0.68rem", color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "1px" }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", padding: "0 2rem 2rem", flexWrap: "wrap" }}>
-        <FilterBtn label="All" active={filter === "all"} onClick={() => setFilter("all")} />
-        <FilterBtn label="Open Now" active={filter === "open"} onClick={() => setFilter("open")} />
-        {cuisineTypes.map(c => (
-          <FilterBtn key={c} label={`${foodIcons[c] || "🍽️"} ${c}`} active={filter === c} onClick={() => setFilter(c)} />
-        ))}
-      </div>
-
-      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 2rem 5rem" }}>
-        {loading ? (
-          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontFamily: f }}>Loading restaurants...</p>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.25rem" }}>
-            {filtered.map(r => (
-              <div key={r.restaurant_id} style={{
-                background: "var(--cr-surface)", borderRadius: "16px", border: "1px solid var(--cr-border)",
-                padding: "2rem",
-                transition: "transform 0.3s var(--ease-out-expo), border-color 0.3s, box-shadow 0.3s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#4CAF50"; e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 40px rgba(0,0,0,0.4)" }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--cr-border)"; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none" }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
-                  <div style={{ fontSize: "2.5rem" }}>{foodIcons[r.food_type] || "🍽️"}</div>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: "6px",
-                    padding: "4px 12px", borderRadius: "50px",
-                    background: r.operational_status === 1 ? "rgba(76,175,80,0.12)" : "rgba(244,67,54,0.12)",
-                    border: `1px solid ${r.operational_status === 1 ? "rgba(76,175,80,0.25)" : "rgba(244,67,54,0.25)"}`,
-                  }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: r.operational_status === 1 ? "#4CAF50" : "#F44336" }} />
-                    <span style={{ fontFamily: f, fontSize: "0.65rem", fontWeight: 600, color: r.operational_status === 1 ? "#81C784" : "#EF9A9A", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                      {r.operational_status === 1 ? "Open" : "Closed"}
-                    </span>
-                  </div>
-                </div>
-                <h2 style={{ fontFamily: fh, fontSize: "1.2rem", fontWeight: 700, color: "white", margin: "0 0 0.35rem" }}>{r.name}</h2>
-                <p style={{ fontFamily: f, fontSize: "0.82rem", color: "rgba(255,255,255,0.45)", margin: "0 0 0.75rem" }}>{r.food_type || "Variety"} Cuisine</p>
-                <div style={{ display: "flex", gap: "1rem", fontFamily: f, fontSize: "0.75rem", color: "rgba(255,255,255,0.3)" }}>
-                  <span>📍 {r.location}</span>
-                  {r.total_sales > 0 && <span>💰 ${Number(r.total_sales).toLocaleString()}</span>}
-                </div>
-              </div>
+        <div style={{ background: "white", padding: "1rem 0", borderBottom: "1px solid #e5e5e8", position: "sticky", top: "94px", zIndex: 10 }}>
+          <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 2rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            {foodTypes.map(type => (
+              <button key={type} onClick={() => setFilter(type)} style={{
+                fontFamily: f, fontSize: "0.78rem", fontWeight: 600, padding: "8px 20px", borderRadius: "50px", cursor: "pointer",
+                border: "1px solid", background: filter === type ? "#C8102E" : "white",
+                color: filter === type ? "white" : "#555", borderColor: filter === type ? "#C8102E" : "#ddd",
+              }}>{type === "All" ? "All Restaurants" : type}</button>
             ))}
           </div>
-        )}
-      </div>
-      <CustomerFooter />
-    </div>
-  )
-}
+        </div>
 
-function FilterBtn({ label, active, onClick }) {
-  return (
-    <button onClick={onClick} style={{
-      fontFamily: "'DM Sans', sans-serif", fontSize: "0.76rem", fontWeight: 600,
-      padding: "7px 18px", borderRadius: "50px", cursor: "pointer",
-      background: active ? "var(--cr-red)" : "transparent",
-      color: active ? "white" : "rgba(255,255,255,0.5)",
-      border: active ? "1px solid var(--cr-red)" : "1px solid var(--cr-border)",
-      transition: "all 0.2s",
-    }}>{label}</button>
+        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
+          {loading ? <p style={{ textAlign: "center", color: "#999", fontFamily: f, padding: "3rem" }}>Loading...</p> : filtered.length === 0 ? <p style={{ textAlign: "center", color: "#999", fontFamily: f, padding: "3rem" }}>No restaurants found.</p> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              {filtered.map((r, idx) => {
+                const isOpen = r.operational_status === 1
+                return (
+                  <div key={r.restaurant_id} style={{
+                    display: "flex", gap: 0, borderRadius: "16px", overflow: "hidden",
+                    background: "white", border: "1px solid #e5e5e8", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                    transition: "transform 0.3s, box-shadow 0.3s", animation: `fadeInUp 0.4s ease-out ${idx * 0.05}s both`,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 12px 32px rgba(0,0,0,0.1)" }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)" }}>
+                    <div style={{ flex: "0 0 300px", height: "220px", overflow: "hidden", position: "relative" }}>
+                      <img src={r.image_url || FALLBACK} alt={r.name}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.6s" }}
+                        onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+                        onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                        onError={e => { e.currentTarget.src = FALLBACK }} />
+                      <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", padding: "4px 14px", borderRadius: "50px", fontFamily: f, fontSize: "0.58rem", fontWeight: 700, color: "white", letterSpacing: "1px", textTransform: "uppercase" }}>{r.location}</div>
+                    </div>
+                    <div style={{ flex: 1, padding: "1.75rem 2rem", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+                        <h2 style={{ fontFamily: fh, fontSize: "1.5rem", fontWeight: 800, color: "#1a1a1a", margin: 0 }}>{r.name}</h2>
+                        <span style={{ fontFamily: f, fontSize: "0.55rem", fontWeight: 700, padding: "3px 10px", borderRadius: "50px", background: isOpen ? "rgba(76,175,80,0.1)" : "rgba(244,67,54,0.1)", color: isOpen ? "#2E7D32" : "#C62828", textTransform: "uppercase", letterSpacing: "1px" }}>{isOpen ? "Open Now" : "Closed"}</span>
+                      </div>
+                      <span style={{ fontFamily: f, fontSize: "0.72rem", fontWeight: 600, color: "#999", marginBottom: "0.75rem" }}>{r.food_type || "Variety"} Cuisine</span>
+                      {r.description && <p style={{ fontFamily: f, fontSize: "0.88rem", color: "#666", lineHeight: 1.6, margin: "0 0 1rem", maxWidth: "550px" }}>{r.description}</p>}
+                      <div style={{ display: "flex", gap: "1.5rem", fontFamily: f, fontSize: "0.78rem", color: "#888" }}>
+                        <div>📍 {r.location}</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+        <CustomerFooter />
+      </div>
+    </div>
   )
 }

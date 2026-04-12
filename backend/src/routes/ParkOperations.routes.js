@@ -13,25 +13,26 @@ router.get("/restaurants", async (req, res) => {
 })
 
 router.post("/restaurants", async (req, res) => {
-  const { name, food_type, location, operational_status } = req.body
+  const { name, food_type, location, operational_status, description, image_url } = req.body
   try {
     const { rows } = await pool.query(
-      `INSERT INTO restaurant (name, food_type, location, operational_status, total_sales)
-       VALUES ($1, $2, $3, $4, 0) RETURNING *`,
-      [name, food_type || null, location, operational_status ?? 1]
+      `INSERT INTO restaurant (name, food_type, location, operational_status, total_sales, description, image_url)
+       VALUES ($1, $2, $3, $4, 0, $5, $6) RETURNING *`,
+      [name, food_type || null, location, operational_status ?? 1, description || null, image_url || null]
     )
     res.status(201).json(rows[0])
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
 router.put("/restaurants/:id", async (req, res) => {
-  const { name, food_type, location, operational_status } = req.body
+  const { name, food_type, location, operational_status, description, image_url } = req.body
   try {
     const { rows } = await pool.query(
       `UPDATE restaurant SET name = COALESCE($1, name), food_type = COALESCE($2, food_type),
-       location = COALESCE($3, location), operational_status = COALESCE($4, operational_status)
-       WHERE restaurant_id = $5 RETURNING *`,
-      [name, food_type, location, operational_status, req.params.id]
+       location = COALESCE($3, location), operational_status = COALESCE($4, operational_status),
+       description = COALESCE($5, description), image_url = COALESCE($6, image_url)
+       WHERE restaurant_id = $7 RETURNING *`,
+      [name, food_type, location, operational_status, description, image_url, req.params.id]
     )
     res.json(rows[0])
   } catch (err) { res.status(500).json({ message: err.message }) }
@@ -55,25 +56,26 @@ router.get("/gift-shops", async (req, res) => {
 })
 
 router.post("/gift-shops", async (req, res) => {
-  const { name, location, operational_status } = req.body
+  const { name, location, operational_status, description, image_url } = req.body
   try {
     const { rows } = await pool.query(
-      `INSERT INTO gift_shop (name, location, operational_status, total_sales)
-       VALUES ($1, $2, $3, 0) RETURNING *`,
-      [name, location, operational_status ?? 1]
+      `INSERT INTO gift_shop (name, location, operational_status, total_sales, description, image_url)
+       VALUES ($1, $2, $3, 0, $4, $5) RETURNING *`,
+      [name, location, operational_status ?? 1, description || null, image_url || null]
     )
     res.status(201).json(rows[0])
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
 router.put("/gift-shops/:id", async (req, res) => {
-  const { name, location, operational_status } = req.body
+  const { name, location, operational_status, description, image_url } = req.body
   try {
     const { rows } = await pool.query(
       `UPDATE gift_shop SET name = COALESCE($1, name), location = COALESCE($2, location),
-       operational_status = COALESCE($3, operational_status)
-       WHERE gift_shop_id = $4 RETURNING *`,
-      [name, location, operational_status, req.params.id]
+       operational_status = COALESCE($3, operational_status),
+       description = COALESCE($4, description), image_url = COALESCE($5, image_url)
+       WHERE gift_shop_id = $6 RETURNING *`,
+      [name, location, operational_status, description, image_url, req.params.id]
     )
     res.json(rows[0])
   } catch (err) { res.status(500).json({ message: err.message }) }
@@ -97,25 +99,27 @@ router.get("/games", async (req, res) => {
 })
 
 router.post("/games", async (req, res) => {
-  const { game_name, max_players, location, operational_status } = req.body
+  const { game_name, max_players, location, operational_status, description, image_url, prize_type } = req.body
   try {
     const { rows } = await pool.query(
-      `INSERT INTO game (game_name, max_players, location, operational_status, total_sales)
-       VALUES ($1, $2, $3, $4, 0) RETURNING *`,
-      [game_name, max_players || 1, location, operational_status ?? 1]
+      `INSERT INTO game (game_name, max_players, location, operational_status, total_sales, description, image_url, prize_type)
+       VALUES ($1, $2, $3, $4, 0, $5, $6, $7) RETURNING *`,
+      [game_name, max_players || 1, location, operational_status ?? 1, description || null, image_url || null, prize_type || null]
     )
     res.status(201).json(rows[0])
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
 router.put("/games/:id", async (req, res) => {
-  const { game_name, max_players, location, operational_status } = req.body
+  const { game_name, max_players, location, operational_status, description, image_url, prize_type } = req.body
   try {
     const { rows } = await pool.query(
       `UPDATE game SET game_name = COALESCE($1, game_name), max_players = COALESCE($2, max_players),
-       location = COALESCE($3, location), operational_status = COALESCE($4, operational_status)
-       WHERE game_id = $5 RETURNING *`,
-      [game_name, max_players, location, operational_status, req.params.id]
+       location = COALESCE($3, location), operational_status = COALESCE($4, operational_status),
+       description = COALESCE($5, description), image_url = COALESCE($6, image_url),
+       prize_type = COALESCE($7, prize_type)
+       WHERE game_id = $8 RETURNING *`,
+      [game_name, max_players, location, operational_status, description, image_url, prize_type, req.params.id]
     )
     res.json(rows[0])
   } catch (err) { res.status(500).json({ message: err.message }) }

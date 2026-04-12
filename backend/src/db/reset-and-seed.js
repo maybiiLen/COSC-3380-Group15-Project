@@ -39,21 +39,40 @@ async function resetAndSeed() {
     if (parseInt(existingRides[0].cnt) === 0) {
       console.log("  ⚠️  Rides table is empty — re-inserting rides...\n");
       await client.query(`
-        INSERT INTO rides (ride_name, capacity_per_cycle, min_height_in, location, status, wait_time, is_operational)
+        INSERT INTO rides (ride_name, capacity_per_cycle, min_height_in, location, status, wait_time, is_operational, description, image_url, ride_type, thrill_level)
         VALUES
-          ('Cougar Express',      32, 48, 'Zone A', 'Operational',  25, true),
-          ('Thunder Canyon',      24, 54, 'Zone B', 'Operational',  40, true),
-          ('Sky Screamer',        16, 60, 'Zone A', 'Operational',  55, true),
-          ('Wild River Rapids',   20, 42, 'Zone C', 'Operational',  30, true),
-          ('Galactic Spinner',    28, 36, 'Zone B', 'Operational',  0, true),
-          ('Mini Coaster',        40, 0,  'Zone D', 'Operational',  15, true),
-          ('Ferris Wheel',        48, 0,  'Zone D', 'Operational',  10, true),
-          ('Haunted Mansion',     12, 48, 'Zone C', 'Operational',  35, true),
-          ('Bumper Cars',         30, 36, 'Zone D', 'Operational',  20, true),
-          ('Drop Tower',          8,  54, 'Zone A', 'Operational',  0, true)
+          ('Cougar Express', 32, 48, 'Zone A', 'Operational', 25, true, 'Our signature steel coaster with sweeping drops, high-speed turns, and stunning mountain views. Not for the faint of heart.', '/rides/cougar-express.jpg', 'Roller Coaster', 'Extreme'),
+          ('Thunder Canyon', 24, 54, 'Zone B', 'Operational', 40, true, 'A wild mine train adventure through rugged canyon terrain with sudden drops and dark tunnels.', '/rides/thunder-canyon.jpg', 'Roller Coaster', 'High'),
+          ('Sky Screamer', 16, 60, 'Zone A', 'Operational', 55, true, 'Soar 200 feet above the park on this extreme swing ride with panoramic views and heart-pounding free-fall moments.', '/rides/sky-screamer.jpg', 'Thrill Ride', 'Extreme'),
+          ('Wild River Rapids', 20, 42, 'Zone C', 'Operational', 30, true, 'Grab your crew and brave the rapids — you will get soaked on this whitewater rafting adventure.', '/rides/wild-river-rapids.jpg', 'Water Ride', 'Moderate'),
+          ('Galactic Spinner', 28, 36, 'Zone B', 'Operational', 0, true, 'A cosmic spinning ride under neon lights. Each pod spins independently as you orbit the galaxy.', '/rides/galactic-spinner.jpg', 'Thrill Ride', 'Moderate'),
+          ('Mini Coaster', 40, 0, 'Zone D', 'Operational', 15, true, 'A dragon-themed family coaster with gentle hills and playful turns. Perfect for young adventurers.', '/rides/mini-coaster.jpg', 'Family Ride', 'Family'),
+          ('Ferris Wheel', 48, 0, 'Zone D', 'Operational', 10, true, 'Take in the glittering skyline from our illuminated Ferris wheel — the perfect ride for a sunset view.', '/rides/ferris-wheel.jpg', 'Family Ride', 'Family'),
+          ('Haunted Mansion', 12, 48, 'Zone C', 'Operational', 35, true, 'Enter if you dare. This dark ride takes you through 13 rooms of ghostly encounters.', '/rides/haunted-mansion.jpg', 'Dark Ride', 'Moderate'),
+          ('Bumper Cars', 30, 36, 'Zone D', 'Operational', 20, true, 'Classic fun for all ages. Bump, dodge, and crash your way through our neon-lit arena.', '/rides/bumper-cars.jpg', 'Family Ride', 'Family'),
+          ('Drop Tower', 8, 54, 'Zone A', 'Operational', 0, true, 'Plunge from dizzying heights in a heart-stopping free-fall. Hold on tight!', '/rides/drop-tower.jpg', 'Thrill Ride', 'Extreme')
       `);
     } else {
       await client.query("UPDATE rides SET status = 'Operational', is_operational = true");
+      // Update descriptions/images for existing rides that don't have them
+      const descUpdates = [
+        ["Cougar Express", "Our signature steel coaster with sweeping drops, high-speed turns, and stunning mountain views.", "/rides/cougar-express.jpg", "Roller Coaster", "Extreme"],
+        ["Thunder Canyon", "A wild mine train adventure through rugged canyon terrain with sudden drops and dark tunnels.", "/rides/thunder-canyon.jpg", "Roller Coaster", "High"],
+        ["Sky Screamer", "Soar 200 feet above the park on this extreme swing ride with panoramic views.", "/rides/sky-screamer.jpg", "Thrill Ride", "Extreme"],
+        ["Wild River Rapids", "Grab your crew and brave the rapids — you will get soaked!", "/rides/wild-river-rapids.jpg", "Water Ride", "Moderate"],
+        ["Galactic Spinner", "A cosmic spinning ride under neon lights. Each pod spins independently.", "/rides/galactic-spinner.jpg", "Thrill Ride", "Moderate"],
+        ["Mini Coaster", "A dragon-themed family coaster with gentle hills and playful turns.", "/rides/mini-coaster.jpg", "Family Ride", "Family"],
+        ["Ferris Wheel", "Take in the glittering skyline from our illuminated Ferris wheel.", "/rides/ferris-wheel.jpg", "Family Ride", "Family"],
+        ["Haunted Mansion", "Enter if you dare. This dark ride takes you through 13 rooms of ghostly encounters.", "/rides/haunted-mansion.jpg", "Dark Ride", "Moderate"],
+        ["Bumper Cars", "Classic fun for all ages. Bump, dodge, and crash your way through our neon-lit arena.", "/rides/bumper-cars.jpg", "Family Ride", "Family"],
+        ["Drop Tower", "Plunge from dizzying heights in a heart-stopping free-fall.", "/rides/drop-tower.jpg", "Thrill Ride", "Extreme"],
+      ];
+      for (const [name, desc, img, rtype, thrill] of descUpdates) {
+        await client.query(
+          "UPDATE rides SET description = COALESCE(description, $1), image_url = COALESCE(image_url, $2), ride_type = COALESCE(ride_type, $3), thrill_level = COALESCE(thrill_level, $4) WHERE ride_name = $5",
+          [desc, img, rtype, thrill, name]
+        );
+      }
     }
 
     // Get actual ride IDs from database
@@ -182,13 +201,13 @@ async function resetAndSeed() {
     console.log("\n🍔 Creating restaurants...\n");
 
     await client.query(`
-      INSERT INTO restaurant (name, food_type, location, operational_status, total_sales)
+      INSERT INTO restaurant (name, food_type, location, operational_status, total_sales, description, image_url)
       VALUES
-        ('Cougar Grill', 'American', 'Zone A', 1, 12450.00),
-        ('Panda Express', 'Asian', 'Zone B', 1, 9800.00),
-        ('Pizza Planet', 'Italian', 'Zone C', 1, 15200.00),
-        ('Snack Shack', 'Snacks & Drinks', 'Zone D', 1, 6300.00),
-        ('The BBQ Pit', 'BBQ', 'Zone A', 0, 0.00)
+        ('Cougar Grill', 'American', 'Zone A', 1, 12450.00, 'Classic American burgers, fries, and shakes. Outdoor seating with views of Thrill Alley.', 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800'),
+        ('Panda Express', 'Asian', 'Zone B', 1, 9800.00, 'Quick-serve Asian favorites including orange chicken, fried rice, and lo mein.', 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800'),
+        ('Pizza Planet', 'Italian', 'Zone C', 1, 15200.00, 'Wood-fired pizzas, pasta, and garlic bread. Our most popular dining spot!', 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800'),
+        ('Snack Shack', 'Snacks & Drinks', 'Zone D', 1, 6300.00, 'Popcorn, pretzels, cotton candy, and refreshing drinks to keep you going.', 'https://images.unsplash.com/photo-1578946956088-940c3b502864?w=800'),
+        ('The BBQ Pit', 'BBQ', 'Zone A', 0, 0.00, 'Slow-smoked brisket, ribs, and pulled pork. Currently closed for renovation.', 'https://images.unsplash.com/photo-1529193591184-b1d58069ecf0?w=800')
       ON CONFLICT DO NOTHING
     `);
     console.log("  ✅ 5 restaurants created");
@@ -199,11 +218,11 @@ async function resetAndSeed() {
     console.log("\n🎁 Creating gift shops...\n");
 
     await client.query(`
-      INSERT INTO gift_shop (name, location, operational_status, total_sales)
+      INSERT INTO gift_shop (name, location, operational_status, total_sales, description, image_url)
       VALUES
-        ('Main Street Gifts', 'Zone A', 1, 18900.00),
-        ('Coaster Corner Store', 'Zone B', 1, 7600.00),
-        ('Splash Zone Souvenirs', 'Zone C', 1, 5400.00)
+        ('Main Street Gifts', 'Zone A', 1, 18900.00, 'The flagship CougarRide gift shop with the widest selection of apparel, souvenirs, and collectibles.', 'https://images.unsplash.com/photo-1513267048331-5611cad62e41?w=800'),
+        ('Coaster Corner Store', 'Zone B', 1, 7600.00, 'Coaster-themed merchandise, ride photos, and exclusive Zone B souvenirs.', 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=800'),
+        ('Splash Zone Souvenirs', 'Zone C', 1, 5400.00, 'Ponchos, towels, waterproof phone cases, and water ride memorabilia.', 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800')
       ON CONFLICT DO NOTHING
     `);
     console.log("  ✅ 3 gift shops created");
@@ -214,13 +233,13 @@ async function resetAndSeed() {
     console.log("\n🎯 Creating games...\n");
 
     await client.query(`
-      INSERT INTO game (game_name, max_players, location, operational_status, total_sales)
+      INSERT INTO game (game_name, max_players, location, operational_status, total_sales, description, image_url, prize_type)
       VALUES
-        ('Ring Toss', 4, 'Zone A', 1, 3200.00),
-        ('Balloon Darts', 2, 'Zone B', 1, 2800.00),
-        ('Water Gun Race', 6, 'Zone C', 1, 4100.00),
-        ('Basketball Shoot', 2, 'Zone D', 1, 1900.00),
-        ('Whack-a-Mole', 1, 'Zone A', 0, 0.00)
+        ('Ring Toss', 4, 'Zone A', 1, 3200.00, 'Toss rings onto bottles to win! Land three in a row for the grand prize.', '/rides/bumper-cars.jpg', 'Giant Stuffed Bear'),
+        ('Balloon Darts', 2, 'Zone B', 1, 2800.00, 'Pop balloons with darts to reveal your prize. Every throw is a winner!', 'https://images.unsplash.com/photo-1527168027773-0cc890c4f42e?w=800', 'Goldfish in Bag'),
+        ('Water Gun Race', 6, 'Zone C', 1, 4100.00, 'Race against friends by shooting water at your target. First to the top wins!', 'https://images.unsplash.com/photo-1504309092620-4d0ec726efa4?w=800', 'Plush Toy'),
+        ('Basketball Shoot', 2, 'Zone D', 1, 1900.00, 'Sink baskets from the three-point line. Three in a row wins the grand prize!', 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800', 'Sports Jersey'),
+        ('Whack-a-Mole', 1, 'Zone A', 0, 0.00, 'Classic arcade fun! Whack as many moles as you can in 60 seconds.', 'https://images.unsplash.com/photo-1511882150382-421056c89033?w=800', 'Mini Plush')
       ON CONFLICT DO NOTHING
     `);
     console.log("  ✅ 5 games created");

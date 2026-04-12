@@ -20,15 +20,15 @@ router.get("/", async (req, res) => {
 
 // ─── POST create a new ride ───
 router.post("/", async (req, res) => {
-  const { ride_name, capacity_per_cycle, min_height_in, location, status } = req.body
+  const { ride_name, capacity_per_cycle, min_height_in, location, status, description, image_url, ride_type, thrill_level } = req.body
   const wait_time = (Math.floor(Math.random() * 12) + 1) * 5
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO rides (ride_name, capacity_per_cycle, min_height_in, location, status, wait_time, is_operational)
-      VALUES ($1, $2, $3, $4, $5, $6, true)
+      `INSERT INTO rides (ride_name, capacity_per_cycle, min_height_in, location, status, wait_time, is_operational, description, image_url, ride_type, thrill_level)
+      VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10)
       RETURNING *`,
-      [ride_name, capacity_per_cycle, min_height_in, location, status, wait_time]
+      [ride_name, capacity_per_cycle, min_height_in, location, status, wait_time, description || null, image_url || null, ride_type || null, thrill_level || null]
     )
     res.status(201).json(rows[0])
   } catch (err) {
@@ -40,7 +40,7 @@ router.post("/", async (req, res) => {
 // ─── PUT update/edit a ride ───
 router.put("/:id", async (req, res) => {
   const { id } = req.params
-  const { ride_name, capacity_per_cycle, min_height_in, location, status } = req.body
+  const { ride_name, capacity_per_cycle, min_height_in, location, status, description, image_url, ride_type, thrill_level } = req.body
 
   try {
     const { rows } = await pool.query(
@@ -49,10 +49,14 @@ router.put("/:id", async (req, res) => {
            capacity_per_cycle = COALESCE($2, capacity_per_cycle),
            min_height_in     = COALESCE($3, min_height_in),
            location          = COALESCE($4, location),
-           status            = COALESCE($5, status)
-       WHERE ride_id = $6
+           status            = COALESCE($5, status),
+           description       = COALESCE($6, description),
+           image_url         = COALESCE($7, image_url),
+           ride_type         = COALESCE($8, ride_type),
+           thrill_level      = COALESCE($9, thrill_level)
+       WHERE ride_id = $10
        RETURNING *`,
-      [ride_name, capacity_per_cycle, min_height_in, location, status, id]
+      [ride_name, capacity_per_cycle, min_height_in, location, status, description, image_url, ride_type, thrill_level, id]
     )
 
     if (rows.length === 0) {

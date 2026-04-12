@@ -639,6 +639,124 @@ const migrations = [
       ALTER TABLE ticket_purchases ADD COLUMN IF NOT EXISTS ticket_type_id INT REFERENCES ticket_types(ticket_type_id) ON DELETE SET NULL;
     `,
   },
+  {
+    name: "028_add_description_image_to_rides",
+    sql: `
+      ALTER TABLE rides ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE rides ADD COLUMN IF NOT EXISTS image_url TEXT;
+      ALTER TABLE rides ADD COLUMN IF NOT EXISTS ride_type VARCHAR(50);
+      ALTER TABLE rides ADD COLUMN IF NOT EXISTS thrill_level VARCHAR(20);
+    `,
+  },
+  {
+    name: "029_add_description_image_to_restaurant",
+    sql: `
+      ALTER TABLE restaurant ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE restaurant ADD COLUMN IF NOT EXISTS image_url TEXT;
+    `,
+  },
+  {
+    name: "030_add_description_image_to_gift_shop",
+    sql: `
+      ALTER TABLE gift_shop ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE gift_shop ADD COLUMN IF NOT EXISTS image_url TEXT;
+    `,
+  },
+  {
+    name: "031_add_description_image_to_game",
+    sql: `
+      ALTER TABLE game ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE game ADD COLUMN IF NOT EXISTS image_url TEXT;
+      ALTER TABLE game ADD COLUMN IF NOT EXISTS prize_type VARCHAR(100);
+    `,
+  },
+  {
+    name: "032_add_type_name_to_ticket_types",
+    sql: `
+      ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS type_name VARCHAR(100);
+    `,
+  },
+  {
+    name: "033_fix_park_closure_trigger",
+    sql: `
+      -- Fix: split into BEFORE (for ended_at) and AFTER (for notifications with closure_id)
+      DROP TRIGGER IF EXISTS trg_park_closure_cascade ON park_closures;
+      DROP FUNCTION IF EXISTS fn_park_closure_cascade();
+
+      -- BEFORE trigger: only handles ended_at timestamp
+      CREATE OR REPLACE FUNCTION fn_park_closure_before()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF TG_OP = 'UPDATE' AND NEW.is_active = false AND OLD.is_active = true THEN
+          NEW.ended_at = NOW();
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_park_closure_before
+      BEFORE UPDATE OF is_active ON park_closures
+      FOR EACH ROW
+      EXECUTE FUNCTION fn_park_closure_before();
+
+      -- AFTER trigger: handles ride updates and notifications (closure_id is available)
+      CREATE OR REPLACE FUNCTION fn_park_closure_after()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_affected_count INTEGER;
+        v_ride_record    RECORD;
+      BEGIN
+        -- ZONE CLOSURE ACTIVATED
+        IF NEW.is_active = true AND (TG_OP = 'INSERT'
+           OR (TG_OP = 'UPDATE' AND OLD.is_active = false)) THEN
+
+          UPDATE rides
+          SET status = 'Closed', is_operational = false
+          WHERE location = NEW.zone AND status != 'Closed';
+
+          GET DIAGNOSTICS v_affected_count = ROW_COUNT;
+
+          INSERT INTO notifications (recipient_role, type, title, message, related_table, related_id)
+          VALUES (
+            'manager', 'park_closure',
+            'Zone Closure: ' || NEW.zone || ' — ' || NEW.closure_type,
+            NEW.zone || ' closed due to ' || LOWER(NEW.closure_type) || ': ' || NEW.reason || '. ' || v_affected_count || ' ride(s) shut down.',
+            'park_closures', NEW.closure_id
+          );
+
+          FOR v_ride_record IN SELECT ride_id, ride_name FROM rides WHERE location = NEW.zone LOOP
+            INSERT INTO notifications (recipient_role, type, title, message, related_table, related_id)
+            VALUES ('staff', 'ride_closed_zone', v_ride_record.ride_name || ' — Closed (Zone Closure)',
+              v_ride_record.ride_name || ' shut down due to ' || LOWER(NEW.closure_type) || ' closure in ' || NEW.zone || '.',
+              'rides', v_ride_record.ride_id);
+          END LOOP;
+
+        -- ZONE CLOSURE DEACTIVATED
+        ELSIF TG_OP = 'UPDATE' AND NEW.is_active = false AND OLD.is_active = true THEN
+          FOR v_ride_record IN SELECT r.ride_id, r.ride_name FROM rides r WHERE r.location = NEW.zone AND r.status = 'Closed' LOOP
+            IF NOT EXISTS (SELECT 1 FROM maintenance_requests WHERE ride_id = v_ride_record.ride_id AND status IN ('Pending', 'In Progress')) THEN
+              UPDATE rides SET status = 'Operational', is_operational = true WHERE ride_id = v_ride_record.ride_id;
+            ELSE
+              UPDATE rides SET status = 'Maintenance', is_operational = true WHERE ride_id = v_ride_record.ride_id;
+            END IF;
+          END LOOP;
+
+          INSERT INTO notifications (recipient_role, type, title, message, related_table, related_id)
+          VALUES ('staff', 'zone_reopened', 'Zone Reopened: ' || NEW.zone,
+            NEW.zone || ' closure lifted. Rides without pending maintenance restored.',
+            'park_closures', NEW.closure_id);
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_park_closure_after
+      AFTER INSERT OR UPDATE OF is_active ON park_closures
+      FOR EACH ROW
+      EXECUTE FUNCTION fn_park_closure_after();
+    `,
+  },
 ];
 
 const run = async () => {

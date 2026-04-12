@@ -87,74 +87,45 @@ export default function AuthPage() {
       minHeight: "100vh", display: "flex",
       background: "#0F0E0E",
     }}>
-      {/* ─── LEFT SIDE: Brand panel ─── */}
+      {/* ─── LEFT SIDE: Image panel ─── */}
       <div style={{
         flex: "0 0 45%", display: "flex", flexDirection: "column",
-        justifyContent: "center", alignItems: "center",
-        background: "linear-gradient(135deg, #0B1D3A, #1a0a2e, #0F0E0E)",
+        justifyContent: "flex-end", alignItems: "center",
+        backgroundImage: "url('/src/assets/auth-bg.jpg')",
+        backgroundSize: "cover", backgroundPosition: "center",
         position: "relative", overflow: "hidden",
         padding: "3rem",
       }}>
-        {/* Decorative gradient blobs */}
+        {/* Dark overlay for text readability */}
         <div style={{
-          position: "absolute", width: "400px", height: "400px",
-          borderRadius: "50%", top: "-100px", right: "-100px",
-          background: "radial-gradient(circle, rgba(200,16,46,0.12) 0%, transparent 70%)",
-        }} />
-        <div style={{
-          position: "absolute", width: "300px", height: "300px",
-          borderRadius: "50%", bottom: "-50px", left: "-50px",
-          background: "radial-gradient(circle, rgba(140,29,64,0.1) 0%, transparent 70%)",
+          position: "absolute", inset: 0,
+          background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.1) 100%)",
         }} />
 
-        <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+        <div style={{ position: "relative", zIndex: 1, textAlign: "center", paddingBottom: "2rem" }}>
           <img src={cougarrideLogoMd} alt="CougarRide" style={{
-            height: "80px", width: "auto", marginBottom: "1.5rem",
-            filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.3))",
+            height: "70px", width: "auto", marginBottom: "1.25rem",
+            filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))",
           }} />
           <h1 style={{
             fontFamily: fh, fontSize: "2.2rem", fontWeight: 900,
             color: "white", margin: "0 0 0.5rem",
             letterSpacing: "2px", textTransform: "uppercase",
+            textShadow: "0 2px 12px rgba(0,0,0,0.6)",
           }}>CougarRide</h1>
           <p style={{
             fontFamily: f, fontSize: "0.8rem",
-            color: "rgba(255,255,255,0.4)", letterSpacing: "2px",
+            color: "rgba(255,255,255,0.7)", letterSpacing: "2px",
             textTransform: "uppercase",
           }}>Theme Park Experience</p>
 
-          <div style={{
-            marginTop: "3rem", padding: "2rem",
-            background: "rgba(255,255,255,0.04)", borderRadius: "16px",
-            border: "1px solid rgba(255,255,255,0.06)",
-            maxWidth: "300px",
+          <p style={{
+            fontFamily: f, fontSize: "0.9rem",
+            color: "rgba(255,255,255,0.6)", lineHeight: 1.6,
+            marginTop: "1.5rem", maxWidth: "320px",
           }}>
-            <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🎢</div>
-            <p style={{
-              fontFamily: f, fontSize: "0.85rem",
-              color: "rgba(255,255,255,0.5)", lineHeight: 1.6,
-            }}>
-              Sign in to purchase tickets, track your visits, and manage your park experience.
-            </p>
-          </div>
-
-          {/* Feature bullets */}
-          <div style={{ marginTop: "2rem", textAlign: "left", maxWidth: "280px" }}>
-            {["Purchase & manage tickets", "Track ride history", "Get exclusive offers"].map((text, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                padding: "0.5rem 0",
-              }}>
-                <div style={{
-                  width: 20, height: 20, borderRadius: "50%",
-                  background: "rgba(200,16,46,0.15)", border: "1px solid rgba(200,16,46,0.25)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#F4845F", fontSize: "0.6rem",
-                }}>✓</div>
-                <span style={{ fontFamily: f, fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>{text}</span>
-              </div>
-            ))}
-          </div>
+            Where every ride tells a story. Sign in to manage your tickets, view ride statuses, and access your personalized park experience.
+          </p>
         </div>
       </div>
 

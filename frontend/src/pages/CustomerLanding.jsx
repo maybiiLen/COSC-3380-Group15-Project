@@ -743,10 +743,50 @@ export default function CustomerLanding() {
       <div style={{ paddingTop: "94px" }}>
         <HeroSection />
         <WhatToDoSection />
-        <RidesSection initialZone={zoneFilter} />
         <PurchasesSection />
+        <ParkPromise />
         <PlanSection />
         <CustomerFooter />
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────
+// PARK PROMISE — creative filler section
+// ────────────────────────────────────────────
+function ParkPromise() {
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, var(--cr-red) 0%, var(--cr-red-dark) 100%)",
+      padding: "5rem 2rem", textAlign: "center",
+    }}>
+      <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+        <h2 style={{
+          fontFamily: "var(--font-heading)", fontSize: "clamp(2rem, 4vw, 3rem)",
+          fontWeight: 900, color: "white", margin: "0 0 1.5rem", lineHeight: 1.1,
+        }}>More Than a Theme Park.<br />It's Where Memories Are Made.</h2>
+        <p style={{
+          fontFamily: "'DM Sans', sans-serif", fontSize: "1.1rem",
+          color: "rgba(255,255,255,0.8)", lineHeight: 1.7, margin: "0 0 2rem",
+        }}>
+          From the moment you walk through our gates, every detail is designed to create unforgettable experiences.
+          World-class rides, award-winning dining, live entertainment, and the warmest staff in the industry — all
+          waiting for you at CougarRide.
+        </p>
+        <div style={{ display: "flex", justifyContent: "center", gap: "3rem", flexWrap: "wrap" }}>
+          {[
+            { num: "10+", label: "Rides & Attractions" },
+            { num: "5", label: "Dining Locations" },
+            { num: "4", label: "Park Zones" },
+            { num: "100%", label: "Fun Guaranteed" },
+          ].map((s, i) => (
+            <div key={i} style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: "var(--font-heading)", fontSize: "2.5rem", fontWeight: 900, color: "white" }}>{s.num}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: "1px" }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
