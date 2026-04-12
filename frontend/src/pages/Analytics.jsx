@@ -18,6 +18,7 @@ export default function Analytics() {
   const [showRawTables, setShowRawTables] = useState(false)
   const [rides, setRides] = useState([])
   const [employees, setEmployees] = useState([])
+  const [ticketTypes, setTicketTypes] = useState([])
 
   const [filters, setFilters] = useState({
     ride_id: '', employee_id: '', status: '', priority: '',
@@ -27,6 +28,7 @@ export default function Analytics() {
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/rides?all=true`).then(r => r.json()).then(d => setRides(Array.isArray(d) ? d : [])).catch(() => {})
     fetch(`${API_BASE_URL}/api/employees`).then(r => r.json()).then(d => setEmployees(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch(`${API_BASE_URL}/api/tickets/types`).then(r => r.json()).then(d => setTicketTypes(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
 
   function resetFilters() {
@@ -174,16 +176,16 @@ export default function Analytics() {
               </div>
             )}
 
-            {/* Ticket type filter — ticketSales */}
+            {/* Ticket type filter — ticketSales (loaded from DB) */}
             {selectedReport === 'ticketSales' && (
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Ticket Type</label>
                 <select value={filters.ticket_type} onChange={e => setFilters({...filters, ticket_type: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#C8102E]">
                   <option value="">All Types</option>
-                  <option value="General Admission">General Admission</option>
-                  <option value="Season Pass">Season Pass</option>
-                  <option value="VIP Experience">VIP Experience</option>
+                  {ticketTypes.map(t => (
+                    <option key={t.name} value={t.name}>{t.name}</option>
+                  ))}
                 </select>
               </div>
             )}
