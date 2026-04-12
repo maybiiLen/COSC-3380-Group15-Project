@@ -373,8 +373,10 @@ function ParkClosuresSection() {
   async function fetchClosures() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/park-ops/park-closures`)
-      const data = await res.json()
-      if (res.ok) setClosures(data)
+      if (res.ok) {
+        const data = await res.json()
+        setClosures(Array.isArray(data) ? data : [])
+      }
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }
@@ -391,13 +393,20 @@ function ParkClosuresSection() {
         setShowAdd(false)
         setForm({ zone: "", closure_type: "Weather", reason: "" })
         fetchClosures()
+      } else {
+        const err = await res.json()
+        alert(err.message || "Failed to create closure")
       }
     } catch (err) { console.error(err) }
   }
 
   async function handleLift(id) {
     try {
-      await fetch(`${API_BASE_URL}/api/park-ops/park-closures/${id}/deactivate`, { method: "PATCH" })
+      const res = await fetch(`${API_BASE_URL}/api/park-ops/park-closures/${id}/deactivate`, { method: "PATCH" })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.message || "Failed to lift closure")
+      }
       fetchClosures()
     } catch (err) { console.error(err) }
   }
