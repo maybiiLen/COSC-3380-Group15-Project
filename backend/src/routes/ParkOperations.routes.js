@@ -1,0 +1,208 @@
+const express = require("express")
+const router = express.Router()
+const pool = require("../config/db")
+
+// ═══════════════════════════════════════════
+// RESTAURANTS
+// ═══════════════════════════════════════════
+router.get("/restaurants", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM restaurant ORDER BY restaurant_id")
+    res.json(rows)
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.post("/restaurants", async (req, res) => {
+  const { name, food_type, location, operational_status } = req.body
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO restaurant (name, food_type, location, operational_status, total_sales)
+       VALUES ($1, $2, $3, $4, 0) RETURNING *`,
+      [name, food_type || null, location, operational_status ?? 1]
+    )
+    res.status(201).json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.put("/restaurants/:id", async (req, res) => {
+  const { name, food_type, location, operational_status } = req.body
+  try {
+    const { rows } = await pool.query(
+      `UPDATE restaurant SET name = COALESCE($1, name), food_type = COALESCE($2, food_type),
+       location = COALESCE($3, location), operational_status = COALESCE($4, operational_status)
+       WHERE restaurant_id = $5 RETURNING *`,
+      [name, food_type, location, operational_status, req.params.id]
+    )
+    res.json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.delete("/restaurants/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM restaurant WHERE restaurant_id = $1", [req.params.id])
+    res.json({ message: "Deleted" })
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+// ═══════════════════════════════════════════
+// GIFT SHOPS
+// ═══════════════════════════════════════════
+router.get("/gift-shops", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM gift_shop ORDER BY gift_shop_id")
+    res.json(rows)
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.post("/gift-shops", async (req, res) => {
+  const { name, location, operational_status } = req.body
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO gift_shop (name, location, operational_status, total_sales)
+       VALUES ($1, $2, $3, 0) RETURNING *`,
+      [name, location, operational_status ?? 1]
+    )
+    res.status(201).json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.put("/gift-shops/:id", async (req, res) => {
+  const { name, location, operational_status } = req.body
+  try {
+    const { rows } = await pool.query(
+      `UPDATE gift_shop SET name = COALESCE($1, name), location = COALESCE($2, location),
+       operational_status = COALESCE($3, operational_status)
+       WHERE gift_shop_id = $4 RETURNING *`,
+      [name, location, operational_status, req.params.id]
+    )
+    res.json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.delete("/gift-shops/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM gift_shop WHERE gift_shop_id = $1", [req.params.id])
+    res.json({ message: "Deleted" })
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+// ═══════════════════════════════════════════
+// GAMES
+// ═══════════════════════════════════════════
+router.get("/games", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM game ORDER BY game_id")
+    res.json(rows)
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.post("/games", async (req, res) => {
+  const { game_name, max_players, location, operational_status } = req.body
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO game (game_name, max_players, location, operational_status, total_sales)
+       VALUES ($1, $2, $3, $4, 0) RETURNING *`,
+      [game_name, max_players || 1, location, operational_status ?? 1]
+    )
+    res.status(201).json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.put("/games/:id", async (req, res) => {
+  const { game_name, max_players, location, operational_status } = req.body
+  try {
+    const { rows } = await pool.query(
+      `UPDATE game SET game_name = COALESCE($1, game_name), max_players = COALESCE($2, max_players),
+       location = COALESCE($3, location), operational_status = COALESCE($4, operational_status)
+       WHERE game_id = $5 RETURNING *`,
+      [game_name, max_players, location, operational_status, req.params.id]
+    )
+    res.json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.delete("/games/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM game WHERE game_id = $1", [req.params.id])
+    res.json({ message: "Deleted" })
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+// ═══════════════════════════════════════════
+// MERCHANDISE
+// ═══════════════════════════════════════════
+router.get("/merch", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM merch ORDER BY merch_id")
+    res.json(rows)
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.post("/merch", async (req, res) => {
+  const { merch_name, merch_category, wholesale_price, retail_price, game_award, sold_location } = req.body
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO merch (merch_name, merch_category, wholesale_price, retail_price, game_award, sold_location, sold_status)
+       VALUES ($1, $2, $3, $4, $5, $6, 1) RETURNING *`,
+      [merch_name, merch_category || 'General', wholesale_price || 0, retail_price || 0, game_award || false, sold_location || 'Main Gift Shop']
+    )
+    res.status(201).json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.put("/merch/:id", async (req, res) => {
+  const { merch_name, merch_category, wholesale_price, retail_price, game_award, sold_location, sold_status } = req.body
+  try {
+    const { rows } = await pool.query(
+      `UPDATE merch SET merch_name = COALESCE($1, merch_name), merch_category = COALESCE($2, merch_category),
+       wholesale_price = COALESCE($3, wholesale_price), retail_price = COALESCE($4, retail_price),
+       game_award = COALESCE($5, game_award), sold_location = COALESCE($6, sold_location),
+       sold_status = COALESCE($7, sold_status)
+       WHERE merch_id = $8 RETURNING *`,
+      [merch_name, merch_category, wholesale_price, retail_price, game_award, sold_location, sold_status, req.params.id]
+    )
+    res.json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.delete("/merch/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM merch WHERE merch_id = $1", [req.params.id])
+    res.json({ message: "Deleted" })
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+// ═══════════════════════════════════════════
+// PARK CLOSURES
+// ═══════════════════════════════════════════
+router.get("/park-closures", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM park_closures ORDER BY started_at DESC")
+    res.json(rows)
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.post("/park-closures", async (req, res) => {
+  const { zone, reason, closure_type } = req.body
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO park_closures (zone, reason, closure_type, is_active)
+       VALUES ($1, $2, $3, true) RETURNING *`,
+      [zone, reason, closure_type || 'Weather']
+    )
+    res.status(201).json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+// Deactivate a closure (rides restored by trigger)
+router.patch("/park-closures/:id/deactivate", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE park_closures SET is_active = false WHERE closure_id = $1 RETURNING *`,
+      [req.params.id]
+    )
+    res.json(rows[0])
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+module.exports = router

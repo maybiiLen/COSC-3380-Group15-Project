@@ -4,17 +4,10 @@ import { useAuth } from "../context/AuthContext"
 import { API_BASE_URL } from "../utils/api"
 import cougarrideLogoMd from "../assets/cougarride-logo-md.png"
 
-// ────────────────────────────────────────────
-// DISNEY-STYLE AUTH FLOW
-// 1. Enter email
-// 2. Backend checks if email exists
-//    → EXISTS: show password field (login)
-//    → NEW: show create account form (register)
-// "Looking for username login?" → jumps to email+password
-// ────────────────────────────────────────────
+const f = "'DM Sans', sans-serif"
+const fh = "var(--font-heading)"
 
 export default function AuthPage() {
-  // Steps: "email" → "login" or "register"
   const [step, setStep] = useState("email")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -28,360 +21,342 @@ export default function AuthPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  // ─── Step 1: Check email against database ───
   async function handleEmailContinue(e) {
     e.preventDefault()
     if (!email) return
     setError("")
     setLoading(true)
-
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/check-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       })
       const data = await res.json()
-
-      if (data.exists) {
-        // Email found → go to password login
-        setStep("login")
-      } else {
-        // New email → go to create account
-        setStep("register")
-      }
-    } catch {
-      setError("Could not connect to server")
-    } finally {
-      setLoading(false)
-    }
+      if (data.exists) setStep("login")
+      else setStep("register")
+    } catch { setError("Could not connect to server") }
+    finally { setLoading(false) }
   }
 
-  // ─── Login ───
   async function handleLogin(e) {
     e.preventDefault()
     setError("")
     setLoading(true)
-
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ email, password }),
       })
       const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.message || "Invalid email or password")
-        return
-      }
-
+      if (!res.ok) { setError(data.message || "Invalid email or password"); return }
       login(data.accessToken, data.user)
-      if (["staff", "manager", "admin"].includes(data.user.role)) {
-        navigate("/dashboard")
-      } else {
-        navigate("/")
-      }
-    } catch {
-      setError("Could not connect to server")
-    } finally {
-      setLoading(false)
-    }
+      if (["staff", "manager", "admin"].includes(data.user.role)) navigate("/dashboard")
+      else navigate("/")
+    } catch { setError("Could not connect to server") }
+    finally { setLoading(false) }
   }
 
-  // ─── Register ───
   async function handleRegister(e) {
     e.preventDefault()
     setError("")
     setLoading(true)
-
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, full_name: fullName, date_of_birth: dateOfBirth, phone }),
       })
       const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.message || "Registration failed")
-        return
-      }
-
-      // Auto-login after register
+      if (!res.ok) { setError(data.message || "Registration failed"); return }
       const loginRes = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ email, password }),
       })
       const loginData = await loginRes.json()
-      if (loginRes.ok) {
-        login(loginData.accessToken, loginData.user)
-        navigate("/")
-      } else {
-        setStep("login")
-      }
-    } catch {
-      setError("Could not connect to server")
-    } finally {
-      setLoading(false)
-    }
+      if (loginRes.ok) { login(loginData.accessToken, loginData.user); navigate("/") }
+      else setStep("login")
+    } catch { setError("Could not connect to server") }
+    finally { setLoading(false) }
   }
 
-  // ─── Edit email (go back to step 1) ───
   function handleEditEmail() {
-    setStep("email")
-    setPassword("")
-    setFullName("")
-    setDateOfBirth("")
-    setPhone("")
-    setError("")
+    setStep("email"); setPassword(""); setFullName(""); setDateOfBirth(""); setPhone(""); setError("")
   }
 
   return (
     <div style={{
-      minHeight: "100vh",
-      background: "linear-gradient(135deg, #0F0E0E 0%, #1A1919 50%, #0F0E0E 100%)",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      padding: "2rem",
+      minHeight: "100vh", display: "flex",
+      background: "#0F0E0E",
     }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@400;500;600;700&display=swap');
-      `}</style>
-
-      {/* Logo */}
-      <Link to="/" style={{
-        textDecoration: "none", marginBottom: "2.5rem", textAlign: "center",
-        display: "flex", flexDirection: "column", alignItems: "center",
-      }}>
-        <img src={cougarrideLogoMd} alt="CougarRide" style={{ height: "65px", width: "auto", marginBottom: "8px" }} />
-        <span style={{
-          fontFamily: "'DM Sans', sans-serif", fontSize: "1.5rem", fontWeight: 900,
-          color: "#C8102E", letterSpacing: "3px", textTransform: "uppercase",
-        }}>COUGARIDE</span>
-        <p style={{
-          fontFamily: "'DM Sans', sans-serif",
-          fontSize: "0.7rem", color: "rgba(255,255,255,0.3)",
-          marginTop: "4px", letterSpacing: "1.5px", textTransform: "uppercase",
-        }}>Theme Park Experience</p>
-      </Link>
-
-      {/* Auth card */}
+      {/* ─── LEFT SIDE: Brand panel ─── */}
       <div style={{
-        width: "100%", maxWidth: "420px",
-        background: "#1A1919", borderRadius: "20px",
-        border: "1px solid #2A2929", padding: "2.5rem",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        flex: "0 0 45%", display: "flex", flexDirection: "column",
+        justifyContent: "center", alignItems: "center",
+        background: "linear-gradient(135deg, #0B1D3A, #1a0a2e, #0F0E0E)",
+        position: "relative", overflow: "hidden",
+        padding: "3rem",
       }}>
+        {/* Decorative gradient blobs */}
+        <div style={{
+          position: "absolute", width: "400px", height: "400px",
+          borderRadius: "50%", top: "-100px", right: "-100px",
+          background: "radial-gradient(circle, rgba(200,16,46,0.12) 0%, transparent 70%)",
+        }} />
+        <div style={{
+          position: "absolute", width: "300px", height: "300px",
+          borderRadius: "50%", bottom: "-50px", left: "-50px",
+          background: "radial-gradient(circle, rgba(140,29,64,0.1) 0%, transparent 70%)",
+        }} />
 
-        {/* ═══════════════════════════════════════ */}
-        {/* STEP 1: Enter email                    */}
-        {/* ═══════════════════════════════════════ */}
-        {step === "email" && (
-          <>
-            <h2 style={headingStyle}>Log In or Create Account</h2>
-            <p style={subtextStyle}>Enter your email to continue to CougarRide</p>
+        <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+          <img src={cougarrideLogoMd} alt="CougarRide" style={{
+            height: "80px", width: "auto", marginBottom: "1.5rem",
+            filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.3))",
+          }} />
+          <h1 style={{
+            fontFamily: fh, fontSize: "2.2rem", fontWeight: 900,
+            color: "white", margin: "0 0 0.5rem",
+            letterSpacing: "2px", textTransform: "uppercase",
+          }}>CougarRide</h1>
+          <p style={{
+            fontFamily: f, fontSize: "0.8rem",
+            color: "rgba(255,255,255,0.4)", letterSpacing: "2px",
+            textTransform: "uppercase",
+          }}>Theme Park Experience</p>
 
-            <form onSubmit={handleEmailContinue}>
-              <label style={labelStyle}>Email Address</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com" required autoFocus
-                style={inputStyle}
-                onFocus={e => e.target.style.borderColor = "#C8102E"}
-                onBlur={e => e.target.style.borderColor = "#3A3939"}
-              />
-
-              {error && <div style={errorStyle}>{error}</div>}
-
-              <button type="submit" disabled={loading} style={primaryBtnStyle}>
-                {loading ? "Checking..." : "Continue"}
-              </button>
-            </form>
-
-            <div style={dividerStyle}>
-              <div style={dividerLine} />
-              <span style={dividerText}>or</span>
-              <div style={dividerLine} />
-            </div>
-
-            <button onClick={() => setStep("login")} style={secondaryBtnStyle}>
-              Looking for username login?
-            </button>
-          </>
-        )}
-
-        {/* ═══════════════════════════════════════ */}
-        {/* STEP 2a: Login (email exists)          */}
-        {/* ═══════════════════════════════════════ */}
-        {step === "login" && (
-          <>
-            <h2 style={headingStyle}>Enter Your Password</h2>
-            <p style={subtextStyle}>
-              Sign in to your CougarRide account using{" "}
-              <strong style={{ color: "white" }}>{email}</strong>{" "}
-              <button onClick={handleEditEmail} style={editLinkStyle}>edit</button>
+          <div style={{
+            marginTop: "3rem", padding: "2rem",
+            background: "rgba(255,255,255,0.04)", borderRadius: "16px",
+            border: "1px solid rgba(255,255,255,0.06)",
+            maxWidth: "300px",
+          }}>
+            <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🎢</div>
+            <p style={{
+              fontFamily: f, fontSize: "0.85rem",
+              color: "rgba(255,255,255,0.5)", lineHeight: 1.6,
+            }}>
+              Sign in to purchase tickets, track your visits, and manage your park experience.
             </p>
+          </div>
 
-            <form onSubmit={handleLogin}>
-              {/* Only show email field if user came via "Looking for username login?" */}
-              {!email && (
-                <div style={{ marginBottom: "1.25rem" }}>
-                  <label style={labelStyle}>Email Address</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    placeholder="you@example.com" required autoFocus
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = "#C8102E"}
-                    onBlur={e => e.target.style.borderColor = "#3A3939"}
-                  />
-                </div>
-              )}
-
-              <div style={{ position: "relative" }}>
-                <label style={labelStyle}>Password</label>
-                <input type={showPassword ? "text" : "password"} value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••" required autoFocus
-                  style={inputStyle}
-                  onFocus={e => e.target.style.borderColor = "#C8102E"}
-                  onBlur={e => e.target.style.borderColor = "#3A3939"}
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} style={showHideBtnStyle}>
-                  {showPassword ? "Hide" : "Show"}
-                </button>
+          {/* Feature bullets */}
+          <div style={{ marginTop: "2rem", textAlign: "left", maxWidth: "280px" }}>
+            {["Purchase & manage tickets", "Track ride history", "Get exclusive offers"].map((text, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: "10px",
+                padding: "0.5rem 0",
+              }}>
+                <div style={{
+                  width: 20, height: 20, borderRadius: "50%",
+                  background: "rgba(200,16,46,0.15)", border: "1px solid rgba(200,16,46,0.25)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#F4845F", fontSize: "0.6rem",
+                }}>✓</div>
+                <span style={{ fontFamily: f, fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>{text}</span>
               </div>
-
-              {error && <div style={errorStyle}>{error}</div>}
-
-              <button type="submit" disabled={loading} style={primaryBtnStyle}>
-                {loading ? "Signing in..." : "Sign In"}
-              </button>
-            </form>
-
-            <button onClick={handleEditEmail} style={backLinkStyle}>
-              ← Back
-            </button>
-          </>
-        )}
-
-        {/* ═══════════════════════════════════════ */}
-        {/* STEP 2b: Create Account (new email)    */}
-        {/* ═══════════════════════════════════════ */}
-        {step === "register" && (
-          <>
-            <h2 style={headingStyle}>Create an Account to Continue</h2>
-            <p style={subtextStyle}>
-              With a CougarRide account, you can purchase tickets, track visits, and manage your park experience.
-              Create your account using{" "}
-              <strong style={{ color: "white" }}>{email}</strong>{" "}
-              <button onClick={handleEditEmail} style={editLinkStyle}>edit</button>
-            </p>
-
-            <form onSubmit={handleRegister}>
-              {/* Full Name */}
-              <div style={{ marginBottom: "1.25rem" }}>
-                <label style={labelStyle}>Full Name</label>
-                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-                  placeholder="John Doe" required autoFocus
-                  style={inputStyle}
-                  onFocus={e => e.target.style.borderColor = "#C8102E"}
-                  onBlur={e => e.target.style.borderColor = "#3A3939"}
-                />
-              </div>
-
-              {/* Date of Birth + Phone side by side */}
-              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Date of Birth</label>
-                  <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)}
-                    required style={{ ...inputStyle, colorScheme: "dark" }}
-                    onFocus={e => e.target.style.borderColor = "#C8102E"}
-                    onBlur={e => e.target.style.borderColor = "#3A3939"}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Phone</label>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-                    placeholder="8325551234" required
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = "#C8102E"}
-                    onBlur={e => e.target.style.borderColor = "#3A3939"}
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div style={{ position: "relative", marginBottom: "0.25rem" }}>
-                <label style={labelStyle}>Password</label>
-                <input type={showPassword ? "text" : "password"} value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Min 8 characters" required minLength={8}
-                  style={inputStyle}
-                  onFocus={e => e.target.style.borderColor = "#C8102E"}
-                  onBlur={e => e.target.style.borderColor = "#3A3939"}
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} style={showHideBtnStyle}>
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
-              <p style={{
-                fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem",
-                color: "rgba(255,255,255,0.25)", margin: "4px 0 0",
-              }}>Must be at least 8 characters</p>
-
-              {error && <div style={{ ...errorStyle, marginTop: "1rem" }}>{error}</div>}
-
-              <button type="submit" disabled={loading} style={primaryBtnStyle}>
-                {loading ? "Creating Account..." : "Create Account"}
-              </button>
-            </form>
-
-            <button onClick={handleEditEmail} style={backLinkStyle}>
-              ← Back
-            </button>
-          </>
-        )}
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Footer */}
-      <p style={{
-        fontFamily: "'DM Sans', sans-serif", fontSize: "0.65rem",
-        color: "rgba(255,255,255,0.15)", marginTop: "2rem",
-        textAlign: "center", maxWidth: "380px", lineHeight: 1.6,
+      {/* ─── RIGHT SIDE: Auth form ─── */}
+      <div style={{
+        flex: 1, display: "flex", flexDirection: "column",
+        justifyContent: "center", alignItems: "center",
+        padding: "3rem",
       }}>
-        By continuing, you agree to CougarRide's Terms of Use and acknowledge
-        that you have read our Privacy Policy.
-        <br />© 2026 CougarRide — COSC 3380 Group 15
-      </p>
+        {/* Back to park */}
+        <Link to="/" style={{
+          position: "absolute", top: "1.5rem", right: "2rem",
+          fontFamily: f, fontSize: "0.78rem", fontWeight: 600,
+          color: "rgba(255,255,255,0.4)",
+          display: "flex", alignItems: "center", gap: "4px",
+          transition: "color 0.2s",
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = "white"}
+        onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.4)"}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          Back to Park
+        </Link>
+
+        <div style={{ width: "100%", maxWidth: "420px" }}>
+          {/* ═══ STEP 1: Email ═══ */}
+          {step === "email" && (
+            <div style={{ animation: "fadeInUp 0.4s ease-out" }}>
+              <h2 style={headingStyle}>Welcome</h2>
+              <p style={subtextStyle}>Enter your email to continue to CougarRide</p>
+
+              <form onSubmit={handleEmailContinue}>
+                <label style={labelStyle}>Email Address</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="you@example.com" required autoFocus
+                  style={inputStyle}
+                  onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                  onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                />
+                {error && <div style={errorStyle}>{error}</div>}
+                <button type="submit" disabled={loading} style={primaryBtnStyle}>
+                  {loading ? "Checking..." : "Continue"}
+                </button>
+              </form>
+
+              <div style={dividerStyle}>
+                <div style={dividerLine} />
+                <span style={dividerText}>or</span>
+                <div style={dividerLine} />
+              </div>
+
+              <button onClick={() => setStep("login")} style={secondaryBtnStyle}>
+                Looking for username login?
+              </button>
+            </div>
+          )}
+
+          {/* ═══ STEP 2a: Login ═══ */}
+          {step === "login" && (
+            <div style={{ animation: "fadeInUp 0.4s ease-out" }}>
+              <h2 style={headingStyle}>Enter Your Password</h2>
+              <p style={subtextStyle}>
+                Sign in using <strong style={{ color: "white" }}>{email}</strong>{" "}
+                <button onClick={handleEditEmail} style={editLinkStyle}>edit</button>
+              </p>
+
+              <form onSubmit={handleLogin}>
+                {!email && (
+                  <div style={{ marginBottom: "1.25rem" }}>
+                    <label style={labelStyle}>Email Address</label>
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                      placeholder="you@example.com" required autoFocus style={inputStyle}
+                      onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                      onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                    />
+                  </div>
+                )}
+
+                <div style={{ position: "relative" }}>
+                  <label style={labelStyle}>Password</label>
+                  <input type={showPassword ? "text" : "password"} value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••" required autoFocus style={inputStyle}
+                    onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                    onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={showHideBtnStyle}>
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+
+                {error && <div style={errorStyle}>{error}</div>}
+                <button type="submit" disabled={loading} style={primaryBtnStyle}>
+                  {loading ? "Signing in..." : "Sign In"}
+                </button>
+              </form>
+
+              <button onClick={handleEditEmail} style={backLinkStyle}>← Back</button>
+            </div>
+          )}
+
+          {/* ═══ STEP 2b: Register ═══ */}
+          {step === "register" && (
+            <div style={{ animation: "fadeInUp 0.4s ease-out" }}>
+              <h2 style={headingStyle}>Create Your Account</h2>
+              <p style={subtextStyle}>
+                Join CougarRide with <strong style={{ color: "white" }}>{email}</strong>{" "}
+                <button onClick={handleEditEmail} style={editLinkStyle}>edit</button>
+              </p>
+
+              <form onSubmit={handleRegister}>
+                <div style={{ marginBottom: "1.25rem" }}>
+                  <label style={labelStyle}>Full Name</label>
+                  <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+                    placeholder="John Doe" required autoFocus style={inputStyle}
+                    onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                    onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Date of Birth</label>
+                    <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)}
+                      required style={{ ...inputStyle, colorScheme: "dark" }}
+                      onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                      onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Phone</label>
+                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                      placeholder="8325551234" required style={inputStyle}
+                      onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                      onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ position: "relative", marginBottom: "0.25rem" }}>
+                  <label style={labelStyle}>Password</label>
+                  <input type={showPassword ? "text" : "password"} value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Min 8 characters" required minLength={8} style={inputStyle}
+                    onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                    onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={showHideBtnStyle}>
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <p style={{ fontFamily: f, fontSize: "0.68rem", color: "rgba(255,255,255,0.2)", margin: "4px 0 0" }}>Must be at least 8 characters</p>
+
+                {error && <div style={{ ...errorStyle, marginTop: "1rem" }}>{error}</div>}
+                <button type="submit" disabled={loading} style={primaryBtnStyle}>
+                  {loading ? "Creating Account..." : "Create Account"}
+                </button>
+              </form>
+
+              <button onClick={handleEditEmail} style={backLinkStyle}>← Back</button>
+            </div>
+          )}
+
+          {/* Footer text */}
+          <p style={{
+            fontFamily: f, fontSize: "0.62rem",
+            color: "rgba(255,255,255,0.12)", marginTop: "2.5rem",
+            textAlign: "center", lineHeight: 1.6,
+          }}>
+            By continuing, you agree to CougarRide's Terms of Use and acknowledge our Privacy Policy.
+            <br />© 2026 CougarRide — COSC 3380 Group 15
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ─── Shared styles ───
+// ─── Shared Styles ───
 
 const headingStyle = {
-  fontFamily: "'Playfair Display', serif",
-  fontSize: "1.5rem", fontWeight: 700, color: "white",
-  margin: "0 0 0.5rem", textAlign: "center",
+  fontFamily: "var(--font-heading)",
+  fontSize: "1.6rem", fontWeight: 800, color: "white",
+  margin: "0 0 0.5rem",
 }
 
 const subtextStyle = {
   fontFamily: "'DM Sans', sans-serif",
   fontSize: "0.85rem", color: "rgba(255,255,255,0.45)",
-  margin: "0 0 2rem", textAlign: "center", lineHeight: 1.5,
+  margin: "0 0 2rem", lineHeight: 1.5,
 }
 
 const labelStyle = {
-  fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem",
-  fontWeight: 600, color: "rgba(255,255,255,0.5)",
+  fontFamily: "'DM Sans', sans-serif", fontSize: "0.73rem",
+  fontWeight: 600, color: "rgba(255,255,255,0.45)",
   textTransform: "uppercase", letterSpacing: "1px",
   display: "block", marginBottom: "6px",
 }
 
 const inputStyle = {
   width: "100%", padding: "13px 16px",
-  background: "#222", border: "1px solid #3A3939",
+  background: "#1A1919", border: "1px solid #3A3939",
   borderRadius: "10px", color: "white",
   fontFamily: "'DM Sans', sans-serif", fontSize: "0.95rem",
   outline: "none", boxSizing: "border-box",
@@ -389,24 +364,24 @@ const inputStyle = {
 }
 
 const errorStyle = {
-  marginTop: "1rem", padding: "10px 14px", borderRadius: "8px",
+  marginTop: "1rem", padding: "10px 14px", borderRadius: "10px",
   background: "rgba(229,57,53,0.12)", border: "1px solid rgba(229,57,53,0.25)",
   fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "#EF9A9A",
 }
 
 const primaryBtnStyle = {
   width: "100%", marginTop: "1.5rem", padding: "14px",
-  background: "linear-gradient(135deg, #C8102E, #8C1D40)",
+  background: "var(--cr-gradient-brand)",
   color: "white", border: "none", borderRadius: "50px",
   fontFamily: "'DM Sans', sans-serif", fontSize: "0.95rem", fontWeight: 700,
   cursor: "pointer", letterSpacing: "0.5px",
   boxShadow: "0 4px 20px rgba(200,16,46,0.35)",
-  transition: "transform 0.15s",
+  transition: "transform 0.2s",
 }
 
 const secondaryBtnStyle = {
   width: "100%", padding: "12px",
-  background: "transparent", color: "rgba(255,255,255,0.6)",
+  background: "transparent", color: "rgba(255,255,255,0.5)",
   border: "1px solid #2A2929", borderRadius: "50px",
   fontFamily: "'DM Sans', sans-serif", fontSize: "0.85rem", fontWeight: 600,
   cursor: "pointer", transition: "all 0.2s",
@@ -443,5 +418,5 @@ const dividerLine = { flex: 1, height: "1px", background: "#2A2929" }
 
 const dividerText = {
   fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem",
-  color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "1px",
+  color: "rgba(255,255,255,0.2)", textTransform: "uppercase", letterSpacing: "1px",
 }

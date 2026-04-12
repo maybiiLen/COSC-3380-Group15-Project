@@ -1,1 +1,217 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap');
+
+:root {
+  /* Brand colors */
+  --cr-red: #C8102E;
+  --cr-red-dark: #8C1D40;
+  --cr-red-light: #F4845F;
+  --cr-navy: #0B1D3A;
+  --cr-navy-dark: #060F1F;
+  --cr-navy-darker: #030a14;
+  --cr-bg: #ffffff;
+  --cr-bg-alt: #f5f5f7;
+  --cr-surface: #ffffff;
+  --cr-surface-light: #f8f8fa;
+  --cr-border: #e5e5e8;
+  --cr-border-light: #d0d0d5;
+  --cr-text: #1a1a1a;
+  --cr-text-muted: rgba(0,0,0,0.6);
+  --cr-text-dim: rgba(0,0,0,0.45);
+  --cr-text-faint: rgba(0,0,0,0.2);
+  --cr-green: #4CAF50;
+  --cr-amber: #FFB74D;
+  --cr-purple: #CE93D8;
+  --cr-coral: #E8533F;
+
+  /* Dark section colors (nav, hero, footer, modals) */
+  --cr-dark-bg: #0F0E0E;
+  --cr-dark-surface: #1A1919;
+  --cr-dark-border: #2A2929;
+
+  /* Gradients */
+  --cr-gradient-brand: linear-gradient(135deg, #C8102E, #8C1D40);
+  --cr-gradient-hero: linear-gradient(135deg, #0B1D3A 0%, #1a0a2e 50%, #0F0E0E 100%);
+  --cr-gradient-surface: linear-gradient(180deg, #f5f5f7, #ffffff);
+
+  /* Typography */
+  --font-heading: 'Outfit', 'DM Sans', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-display: 'Playfair Display', serif;
+
+  /* Transitions */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 0.15s ease;
+  --transition-smooth: 0.3s var(--ease-out-expo);
+  --transition-slow: 0.5s var(--ease-out-expo);
+}
+
+/* ─── Global Resets ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--cr-bg);
+  color: var(--cr-text);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* ─── Custom Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--cr-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cr-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cr-border-light);
+}
+
+/* ─── Selection ─── */
+::selection {
+  background: rgba(200, 16, 46, 0.3);
+  color: white;
+}
+
+/* ─── Focus Visible ─── */
+:focus-visible {
+  outline: 2px solid var(--cr-red);
+  outline-offset: 2px;
+}
+
+/* ─── Links ─── */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ─── Images ─── */
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* ─── Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes heroFadeIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(200, 16, 46, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(200, 16, 46, 0.4); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes progressBar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+/* ─── Utility Classes for Customer Pages ─── */
+.cr-clip-diagonal {
+  clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
+}
+
+.cr-clip-wave {
+  clip-path: polygon(0 0, 100% 0, 100% 90%, 75% 95%, 50% 90%, 25% 95%, 0 90%);
+}
+
+.cr-glass {
+  background: rgba(15, 14, 14, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.cr-hover-lift {
+  transition: transform 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo);
+}
+.cr-hover-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.cr-hover-scale {
+  transition: transform 0.5s var(--ease-out-expo);
+}
+.cr-hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.cr-text-gradient {
+  background: linear-gradient(135deg, #C8102E, #F4845F);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Container utility ─── */
+.cr-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}

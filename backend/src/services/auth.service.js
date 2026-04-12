@@ -81,10 +81,12 @@ const loginUser = async (email, password) => {
     expiresAt: refreshTokenExpiresAt(),
   });
 
+  const fullName = profile?.full_name || null;
+
   return {
     accessToken: generateAccessToken(user, profileId),
     rawRefreshToken,
-    user: { id: user.id, email: user.email, role: user.role },
+    user: { id: user.id, email: user.email, role: user.role, full_name: fullName },
     profile,
   };
 };

@@ -4,22 +4,17 @@ const pool = require("../config/db")
 const verifyToken = require("../middleware/verifyToken")
 const verifyRole = require("../middleware/verifyRole")
 
-// ─── Ticket pricing config ───
-const TICKET_PRICES = {
-  "General Admission": { adult: 49, child: 35 },
-  "Season Pass":       { adult: 149, child: 99 },
-  "VIP Experience":    { adult: 89, child: 69 },
-}
-
-// ─── GET available ticket types (public) ───
+// ─── GET available ticket types from DATABASE (no hardcoding) ───
 router.get("/types", async (req, res) => {
   try {
-    const types = Object.entries(TICKET_PRICES).map(([name, prices]) => ({
-      name,
-      adult_price: prices.adult,
-      child_price: prices.child,
-    }))
-    res.json(types)
+    const { rows } = await pool.query(`
+      SELECT ticket_type_id, type_name AS name, base_price AS adult_price,
+             COALESCE(child_price, ROUND(base_price * 0.7, 2)) AS child_price,
+             ticket_category, fast_pass, description
+      FROM ticket_types
+      ORDER BY base_price ASC
+    `)
+    res.json(rows)
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
@@ -39,11 +34,10 @@ const optionalAuth = (req, res, next) => {
 }
 
 // ─── POST purchase tickets (guest or logged-in) ───
-// Accepts cart items, card details (last 4 stored), visit_date
+// Prices looked up from ticket_types table — never hardcoded
 router.post("/purchase", optionalAuth, async (req, res) => {
   const { items, card_last_four, cardholder_name, visit_date, guest_email } = req.body
 
-  // items = [{ ticket_type, adult_qty, child_qty }]
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: "Cart is empty" })
   }
@@ -60,11 +54,24 @@ router.post("/purchase", optionalAuth, async (req, res) => {
       customerId = rows.length > 0 ? rows[0].customer_id : null
     }
 
+    // Load ALL ticket type pricing from the database
+    const { rows: ticketTypes } = await client.query(
+      "SELECT ticket_type_id, type_name, base_price, COALESCE(child_price, ROUND(base_price * 0.7, 2)) AS child_price FROM ticket_types"
+    )
+    const priceMap = {}
+    for (const t of ticketTypes) {
+      priceMap[t.type_name] = {
+        id: t.ticket_type_id,
+        adult: parseFloat(t.base_price),
+        child: parseFloat(t.child_price),
+      }
+    }
+
     const purchases = []
     let orderTotal = 0
 
     for (const item of items) {
-      const pricing = TICKET_PRICES[item.ticket_type]
+      const pricing = priceMap[item.ticket_type]
       if (!pricing) {
         await client.query("ROLLBACK")
         return res.status(400).json({ message: `Invalid ticket type: ${item.ticket_type}` })
@@ -79,12 +86,12 @@ router.post("/purchase", optionalAuth, async (req, res) => {
 
       const { rows } = await client.query(
         `INSERT INTO ticket_purchases
-          (customer_id, user_id, ticket_type, adult_qty, child_qty,
+          (customer_id, user_id, ticket_type, ticket_type_id, adult_qty, child_qty,
            unit_price_adult, unit_price_child, total_price, visit_date,
            card_last_four, cardholder_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING *`,
-        [customerId, userId, item.ticket_type, adults, children,
+        [customerId, userId, item.ticket_type, pricing.id, adults, children,
          pricing.adult, pricing.child, total, visit_date || null,
          card_last_four || null, cardholder_name || null]
       )
@@ -111,7 +118,11 @@ router.post("/purchase", optionalAuth, async (req, res) => {
 router.get("/my-purchases", verifyToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM ticket_purchases WHERE user_id = $1 ORDER BY purchase_date DESC`,
+      `SELECT tp.*, tt.description AS type_description, tt.fast_pass
+       FROM ticket_purchases tp
+       LEFT JOIN ticket_types tt ON tt.ticket_type_id = tp.ticket_type_id
+       WHERE tp.user_id = $1
+       ORDER BY tp.purchase_date DESC`,
       [req.user.id]
     )
     res.json(rows)
@@ -135,7 +146,6 @@ router.get("/all-purchases", verifyToken, verifyRole("manager", "admin"), async 
   const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : ""
 
   try {
-    // Detail rows
     const { rows: details } = await pool.query(`
       SELECT tp.purchase_id, tp.ticket_type,
         COALESCE(c.full_name, u.email, 'Guest') AS customer_name,
@@ -148,7 +158,6 @@ router.get("/all-purchases", verifyToken, verifyRole("manager", "admin"), async 
       ${where} ORDER BY tp.purchase_date DESC
     `, params)
 
-    // Summary by type
     const { rows: summary } = await pool.query(`
       SELECT tp.ticket_type,
         COUNT(tp.purchase_id) AS total_transactions,
@@ -160,7 +169,6 @@ router.get("/all-purchases", verifyToken, verifyRole("manager", "admin"), async 
       GROUP BY tp.ticket_type ORDER BY subtotal_revenue DESC
     `, params)
 
-    // Grand totals
     const { rows: totals } = await pool.query(`
       SELECT COUNT(tp.purchase_id) AS total_transactions,
         SUM(tp.adult_qty) AS total_adults, SUM(tp.child_qty) AS total_children,
@@ -181,43 +189,6 @@ router.get("/all-purchases", verifyToken, verifyRole("manager", "admin"), async 
     res.json({ details, summary, totals: totals[0] })
   } catch (err) {
     console.log("Report error:", err.message)
-    res.status(500).json({ message: err.message })
-  }
-})
-
-// ─── POST seed sample purchases (for demo — call once) ───
-router.post("/seed-demo", async (req, res) => {
-  try {
-    const { rows: existing } = await pool.query("SELECT COUNT(*) AS cnt FROM ticket_purchases")
-    if (parseInt(existing[0].cnt) > 5) {
-      return res.json({ message: "Demo data already exists" })
-    }
-
-    const samplePurchases = [
-      ["General Admission", 2, 1, 49, 35, 133, "2026-04-01", "4242", "Maria Garcia"],
-      ["Season Pass", 1, 0, 149, 99, 149, "2026-03-20", "1234", "James Wilson"],
-      ["VIP Experience", 2, 2, 89, 69, 316, "2026-04-05", "5678", "Sarah Johnson"],
-      ["General Admission", 1, 2, 49, 35, 119, "2026-03-28", "9012", "Michael Brown"],
-      ["Season Pass", 2, 0, 149, 99, 298, "2026-03-15", "3456", "Emily Davis"],
-      ["General Admission", 4, 0, 49, 35, 196, "2026-04-02", "7890", "Robert Martinez"],
-      ["VIP Experience", 1, 1, 89, 69, 158, "2026-04-03", null, null],
-      ["General Admission", 2, 3, 49, 35, 203, "2026-03-30", "2345", "Jennifer Lee"],
-      ["Season Pass", 1, 1, 149, 99, 248, "2026-03-25", "6789", "David Anderson"],
-      ["General Admission", 3, 0, 49, 35, 147, "2026-04-04", null, null],
-      ["VIP Experience", 2, 0, 89, 69, 178, "2026-03-22", "0123", "Lisa Thomas"],
-      ["Season Pass", 1, 0, 149, 99, 149, "2026-04-01", "4567", "Chris Taylor"],
-    ]
-
-    for (const p of samplePurchases) {
-      await pool.query(
-        `INSERT INTO ticket_purchases (ticket_type, adult_qty, child_qty, unit_price_adult, unit_price_child, total_price, visit_date, card_last_four, cardholder_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        p
-      )
-    }
-
-    res.json({ message: "Seeded 12 sample ticket purchases" })
-  } catch (err) {
     res.status(500).json({ message: err.message })
   }
 })

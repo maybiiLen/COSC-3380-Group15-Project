@@ -8,6 +8,8 @@ const maintenanceRouter = require("./routes/maintenance.routes")
 const employeesRouter = require("./routes/employees.routes")
 const reportsRouter = require("./routes/reports.routes")
 const ticketsRouter = require("./routes/tickets.routes")
+const notificationsRouter = require("./routes/notifications.routes")
+const parkOpsRouter = require("./routes/ParkOperations.routes")
 
 const app = express();
 
@@ -25,5 +27,7 @@ app.use("/api/maintenance", maintenanceRouter)
 app.use("/api/employees", employeesRouter)
 app.use("/api/reports", reportsRouter)
 app.use("/api/tickets", ticketsRouter)
+app.use("/api/notifications", notificationsRouter)
+app.use("/api/park-ops", parkOpsRouter)
 
 module.exports = app;

@@ -352,6 +352,155 @@ export default function Maintenance() {
           ))}
         </tbody>
       </table>
+
+      {/* ─── PARK CLOSURES SECTION (manager/admin only) ─── */}
+      {["manager", "admin"].includes(user?.role) && (
+        <ParkClosuresSection />
+      )}
+    </div>
+  )
+}
+
+// ─── Park Closures Sub-Component ───
+function ParkClosuresSection() {
+  const [closures, setClosures] = useState([])
+  const [showAdd, setShowAdd] = useState(false)
+  const [form, setForm] = useState({ zone: "", closure_type: "Weather", reason: "" })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { fetchClosures() }, [])
+
+  async function fetchClosures() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/park-ops/park-closures`)
+      const data = await res.json()
+      if (res.ok) setClosures(data)
+    } catch (err) { console.error(err) }
+    finally { setLoading(false) }
+  }
+
+  async function handleCreate(e) {
+    e.preventDefault()
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/park-ops/park-closures`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      if (res.ok) {
+        setShowAdd(false)
+        setForm({ zone: "", closure_type: "Weather", reason: "" })
+        fetchClosures()
+      }
+    } catch (err) { console.error(err) }
+  }
+
+  async function handleLift(id) {
+    try {
+      await fetch(`${API_BASE_URL}/api/park-ops/park-closures/${id}/deactivate`, { method: "PATCH" })
+      fetchClosures()
+    } catch (err) { console.error(err) }
+  }
+
+  return (
+    <div className="mt-10">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Zone Closures</h2>
+          <p className="text-sm text-gray-500">Close entire zones due to weather, emergency, or safety — triggers automatically shut down all rides in the zone</p>
+        </div>
+        <button onClick={() => setShowAdd(true)}
+          className="flex items-center gap-1 px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer">
+          ⚠️ Create Zone Closure
+        </button>
+      </div>
+
+      {/* Create Closure Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md">
+            <h2 className="font-bold text-xl text-gray-900 mb-4">Create Zone Closure</h2>
+            <form onSubmit={handleCreate} className="flex flex-col gap-3">
+              <select required value={form.zone} onChange={e => setForm({...form, zone: e.target.value})}
+                className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#C8102E]">
+                <option value="">Select Zone</option>
+                <option value="Zone A">Zone A</option>
+                <option value="Zone B">Zone B</option>
+                <option value="Zone C">Zone C</option>
+                <option value="Zone D">Zone D</option>
+              </select>
+              <select value={form.closure_type} onChange={e => setForm({...form, closure_type: e.target.value})}
+                className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#C8102E]">
+                <option value="Weather">Weather</option>
+                <option value="Emergency">Emergency</option>
+                <option value="Safety">Safety</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Event">Event</option>
+              </select>
+              <textarea placeholder="Reason for closure" required value={form.reason} onChange={e => setForm({...form, reason: e.target.value})}
+                className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#C8102E]" rows={3} />
+              <p className="text-xs text-red-500">⚠️ This will automatically close ALL rides in the selected zone and notify staff via the notification trigger.</p>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" className="flex-1 px-4 py-2.5 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer">Activate Closure</button>
+                <button type="button" onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Closures Table */}
+      {loading ? (
+        <p className="text-gray-400 text-sm py-4">Loading closures...</p>
+      ) : closures.length === 0 ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm text-gray-400 text-sm text-center">No zone closures on record.</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Zone</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Type</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Reason</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Started</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Ended</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {closures.map(c => (
+              <tr key={c.closure_id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium text-gray-900">{c.zone}</td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    c.closure_type === "Emergency" ? "bg-red-100 text-red-700" :
+                    c.closure_type === "Weather" ? "bg-blue-100 text-blue-700" :
+                    c.closure_type === "Safety" ? "bg-orange-100 text-orange-700" :
+                    "bg-gray-100 text-gray-700"
+                  }`}>{c.closure_type}</span>
+                </td>
+                <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{c.reason}</td>
+                <td className="px-4 py-3">
+                  {c.is_active ?
+                    <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Active</span> :
+                    <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Resolved</span>
+                  }
+                </td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{new Date(c.started_at).toLocaleString()}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{c.ended_at ? new Date(c.ended_at).toLocaleString() : "—"}</td>
+                <td className="px-4 py-3">
+                  {c.is_active && (
+                    <button onClick={() => handleLift(c.closure_id)}
+                      className="text-green-600 hover:text-green-800 text-xs font-medium cursor-pointer">
+                      ✅ Lift Closure
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

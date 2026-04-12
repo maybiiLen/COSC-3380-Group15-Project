@@ -3,6 +3,10 @@ import Sidebar from "./Sidebar";
 import ProtectedRoute from "./pages/ProtectedRoute";
 import CustomerLanding from "./pages/CustomerLanding";
 import TicketShop from "./pages/TicketShop";
+import DiningPage from "./pages/DiningPage";
+import GamesPage from "./pages/GamesPage";
+import ShoppingPage from "./pages/ShoppingPage";
+import CustomerRidesPage from "./pages/CustomerRidesPage";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -10,9 +14,7 @@ import Home from "./pages/Home";
 import Rides from "./pages/Rides";
 import Staff from "./pages/Staff";
 import Tickets from "./pages/Tickets";
-import Restaurant from "./pages/Restaurant";
-import GiftShop from "./pages/GiftShop";
-import Merchandise from "./pages/Merchandise";
+import ParkOperations from "./pages/ParkOperations";
 import Maintenance from "./pages/Maintenance";
 import Analytics from "./pages/Analytics";
 
@@ -26,9 +28,7 @@ function DashboardLayout() {
           <Route path="/rides" element={<Rides />} />
           <Route path="/staff" element={<Staff />} />
           <Route path="/tickets" element={<Tickets />} />
-          <Route path="/restaurant" element={<Restaurant />} />
-          <Route path="/gift-shop" element={<GiftShop />} />
-          <Route path="/merchandise" element={<Merchandise />} />
+          <Route path="/dining-shops" element={<ParkOperations />} />
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/analytics" element={<Analytics />} />
         </Routes>
@@ -44,6 +44,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<CustomerLanding />} />
           <Route path="/tickets" element={<TicketShop />} />
+          <Route path="/dining" element={<DiningPage />} />
+          <Route path="/games" element={<GamesPage />} />
+          <Route path="/shopping" element={<ShoppingPage />} />
+          <Route path="/rides" element={<CustomerRidesPage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/login" element={<Navigate to="/auth" replace />} />
           <Route path="/register" element={<Navigate to="/auth" replace />} />
