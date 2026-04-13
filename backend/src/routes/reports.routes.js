@@ -118,15 +118,9 @@ router.get("/maintenance", async (req, res) => {
       return
     }
 
-    // Raw table data for display
-    const { rows: rawMaintenance } = await pool.query("SELECT request_id, ride_id, employee_id, description, priority, status, created_at, completed_at FROM maintenance_requests ORDER BY created_at DESC LIMIT 20")
-    const { rows: rawRides } = await pool.query("SELECT ride_id, ride_name, location, status, capacity_per_cycle FROM rides ORDER BY ride_id LIMIT 20")
-    const { rows: rawEmployees } = await pool.query("SELECT employee_id, full_name, email, role FROM employees ORDER BY employee_id LIMIT 20")
-
     res.json({
       details, summary, totals: totals[0],
-      tables_used: ["maintenance_requests", "rides", "employees"],
-      raw_tables: { maintenance_requests: rawMaintenance, rides: rawRides, employees: rawEmployees }
+      tables_used: ["maintenance_requests", "rides", "employees"]
     })
   } catch (err) {
     console.log("Report error:", err.message)
@@ -210,11 +204,6 @@ router.get("/ticket-sales", async (req, res) => {
       ${where}
     `, params)
 
-    // Raw table data for display
-    const { rows: rawTicketPurchases } = await pool.query("SELECT purchase_id, customer_id, ticket_type, adult_qty, child_qty, total_price, visit_date, purchase_date FROM ticket_purchases ORDER BY purchase_date DESC LIMIT 20")
-    const { rows: rawCustomers } = await pool.query("SELECT customer_id, full_name, email, phone FROM customers ORDER BY customer_id LIMIT 20")
-    const { rows: rawTicketTypes } = await pool.query("SELECT ticket_type_id, type_name, base_price, ticket_category, fast_pass FROM ticket_types ORDER BY ticket_type_id")
-
     if (format === 'csv') {
       const csvHeaders = 'Purchase ID,Customer,Type,Category,Fast Pass,Adults,Children,Total,Date\n'
       const csvRows = details.map(row =>
@@ -229,8 +218,7 @@ router.get("/ticket-sales", async (req, res) => {
       details,
       byType,
       totals: totals[0],
-      tables_used: ["ticket_purchases", "customers", "ticket_types"],
-      raw_tables: { ticket_purchases: rawTicketPurchases, customers: rawCustomers, ticket_types: rawTicketTypes }
+      tables_used: ["ticket_purchases", "customers", "ticket_types"]
     })
   } catch (err) {
     console.log("DB error:", err.message)
@@ -329,11 +317,6 @@ router.get("/employee-activity", async (req, res) => {
       ${where}
     `, params)
 
-    // Raw table data for display
-    const { rows: rawEmployees } = await pool.query("SELECT employee_id, full_name, email, role, hourly_rate FROM employees ORDER BY employee_id LIMIT 20")
-    const { rows: rawMaintenance } = await pool.query("SELECT request_id, ride_id, employee_id, description, priority, status, created_at, completed_at FROM maintenance_requests ORDER BY created_at DESC LIMIT 20")
-    const { rows: rawRides } = await pool.query("SELECT ride_id, ride_name, location, status FROM rides ORDER BY ride_id LIMIT 20")
-
     if (format === 'csv') {
       const csvHeaders = 'Employee,Role,Ride,Task,Priority,Status,Assigned,Completed,Hours\n'
       const csvRows = details.map(row =>
@@ -348,8 +331,7 @@ router.get("/employee-activity", async (req, res) => {
       details,
       summary,
       totals: totals[0],
-      tables_used: ["employees", "maintenance_requests", "rides"],
-      raw_tables: { employees: rawEmployees, maintenance_requests: rawMaintenance, rides: rawRides }
+      tables_used: ["employees", "maintenance_requests", "rides"]
     })
   } catch (err) {
     console.log("DB error:", err.message)

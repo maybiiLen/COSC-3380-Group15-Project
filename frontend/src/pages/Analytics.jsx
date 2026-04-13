@@ -14,7 +14,6 @@ export default function Analytics() {
   const [reportData, setReportData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
-  const [showRawTables, setShowRawTables] = useState(false)
   const [rides, setRides] = useState([])
   const [employees, setEmployees] = useState([])
   const [ticketTypes, setTicketTypes] = useState([])
@@ -34,8 +33,7 @@ export default function Analytics() {
     setFilters({ ride_id: '', employee_id: '', status: '', priority: '', ticket_type: '', customer_name: '', start_date: '', end_date: '' })
     setShowResults(false)
     setReportData(null)
-    setShowRawTables(false)
-  }
+      }
 
   async function viewReport() {
     if (!selectedReport) return
@@ -277,55 +275,6 @@ export default function Analytics() {
             </>
           )}
 
-          {/* ─── RAW TABLE DATA ─── */}
-          <div className="mt-4">
-            <button onClick={() => setShowRawTables(!showRawTables)}
-              className="text-sm font-medium text-[#C8102E] hover:underline cursor-pointer">
-              {showRawTables ? 'Hide' : 'Show'} Source Tables Used ({(reportData.tables_used || []).join(', ')})
-            </button>
-
-            {showRawTables && reportData.raw_tables && (
-              <div className="mt-4 space-y-6">
-                {Object.entries(reportData.raw_tables).map(([tableName, rows]) => (
-                  <div key={tableName}>
-                    <h4 className="text-sm font-bold text-gray-700 mb-2">
-                      Table: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{tableName}</code>
-                      <span className="text-xs text-gray-400 ml-2">({rows.length} rows shown)</span>
-                    </h4>
-                    {rows.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs border border-gray-200">
-                          <thead className="bg-gray-100">
-                            <tr>
-                              {Object.keys(rows[0]).map(col => (
-                                <th key={col} className="px-3 py-2 text-left font-medium text-gray-500 border-b">{col}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {rows.map((row, i) => (
-                              <tr key={i} className="hover:bg-gray-50">
-                                {Object.values(row).map((val, j) => (
-                                  <td key={j} className="px-3 py-1.5 text-gray-600 border-b max-w-xs truncate">
-                                    {val === null ? <span className="text-gray-300">NULL</span>
-                                      : typeof val === 'boolean' ? (val ? 'true' : 'false')
-                                      : String(val).length > 50 ? String(val).slice(0, 50) + '...'
-                                      : String(val)}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-400">No data in this table</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
     </div>
