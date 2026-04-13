@@ -4,7 +4,6 @@ import { API_BASE_URL } from '../utils/api'
 
 const REPORTS = [
   { id: 'maintenance', label: 'Maintenance Report', desc: 'Maintenance requests by ride and employee', tables: ['maintenance_requests', 'rides', 'employees'] },
-  { id: 'rideUsage', label: 'Ride Usage Report', desc: 'Ride activity, visitor counts, and wait times', tables: ['rides', 'ride_usage', 'maintenance_requests'] },
   { id: 'ticketSales', label: 'Ticket Sales Report', desc: 'Ticket purchases, revenue, and customer data', tables: ['ticket_purchases', 'customers', 'ticket_types'] },
   { id: 'employeeActivity', label: 'Employee Activity Report', desc: 'Employee task assignments and performance', tables: ['employees', 'maintenance_requests', 'rides'] },
 ]
@@ -44,7 +43,6 @@ export default function Analytics() {
     setShowResults(false)
 
     const endpoint = selectedReport === 'maintenance' ? 'maintenance'
-      : selectedReport === 'rideUsage' ? 'ride-usage'
       : selectedReport === 'ticketSales' ? 'ticket-sales'
       : 'employee-activity'
 
@@ -66,7 +64,6 @@ export default function Analytics() {
   async function saveAsCSV() {
     if (!selectedReport) return
     const endpoint = selectedReport === 'maintenance' ? 'maintenance'
-      : selectedReport === 'rideUsage' ? 'ride-usage'
       : selectedReport === 'ticketSales' ? 'ticket-sales'
       : 'employee-activity'
 
@@ -102,7 +99,7 @@ export default function Analytics() {
       <p className="mt-1 text-sm text-gray-500">Select a report, set your filters, and click View Report</p>
 
       {/* Report Selection */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {REPORTS.map(r => (
           <button key={r.id} onClick={() => { setSelectedReport(r.id); setShowResults(false); setReportData(null); setShowRawTables(false) }}
             className={`text-left p-4 rounded-xl border cursor-pointer transition-all ${
@@ -123,8 +120,8 @@ export default function Analytics() {
           <h2 className="text-lg font-bold text-gray-900 mb-4">{reportInfo?.label}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
-            {/* Ride filter — maintenance, rideUsage */}
-            {['maintenance', 'rideUsage'].includes(selectedReport) && (
+            {/* Ride filter — maintenance */}
+            {selectedReport === 'maintenance' && (
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Ride</label>
                 <select value={filters.ride_id} onChange={e => setFilters({...filters, ride_id: e.target.value})}
@@ -255,17 +252,6 @@ export default function Analytics() {
                 totals={reportData.totals ? ['TOTAL', reportData.totals.total_requests, reportData.totals.pending, reportData.totals.in_progress, reportData.totals.completed, `${reportData.totals.completion_rate_pct}%`, reportData.totals.avg_hours_to_complete ?? '—', `${reportData.totals.total_downtime_hours ?? '—'}h`] : null} />
               <ReportTable title="Maintenance Detail" columns={['ID', 'Ride', 'Description', 'Priority', 'Status', 'Assigned To', 'Date']}
                 rows={reportData.details?.map(r => [`#${r.request_id}`, r.ride_name, r.description, r.priority, r.status, r.assigned_to, new Date(r.request_date).toLocaleDateString()])} />
-            </>
-          )}
-
-          {/* ─── Ride Usage Report Results ─── */}
-          {selectedReport === 'rideUsage' && (
-            <>
-              <ReportTable title="Usage by Zone" columns={['Zone', 'Rides', 'Total Rides', 'Visitors', 'Rides/Visitor', 'Avg Wait', 'Fast Pass %']}
-                rows={reportData.byZone?.map(r => [r.zone_name, r.rides_in_zone, r.total_rides, r.unique_customers, r.rides_per_visitor, `${r.avg_wait_time} min`, `${r.fast_pass_percentage}%`])}
-                totals={reportData.totals ? ['TOTAL', reportData.totals.total_ride_count, reportData.totals.total_rides, reportData.totals.unique_customers, reportData.totals.rides_per_visitor, `${reportData.totals.avg_wait_time} min`, `${reportData.totals.fast_pass_percentage}%`] : null} />
-              <ReportTable title="Usage by Ride" columns={['Ride', 'Zone', 'Status', 'Total Rides', 'Visitors', 'Utilization %', 'Maintenance']}
-                rows={reportData.byRide?.map(r => [r.ride_name, r.location, r.status, r.total_rides, r.unique_customers, `${r.utilization_pct}%`, r.maintenance_requests])} />
             </>
           )}
 
