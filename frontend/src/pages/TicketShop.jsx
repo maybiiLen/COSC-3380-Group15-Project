@@ -27,7 +27,8 @@ export default function TicketShop() {
   const [cart, setCart] = useState([])
   const [visitDate, setVisitDate] = useState("")
   const [cardForm, setCardForm] = useState({ number: "", expiry: "", cvv: "", name: "" })
-  const [guestEmail, setGuestEmail] = useState("")
+  const [buyerName, setBuyerName] = useState(user?.full_name || "")
+  const [buyerEmail, setBuyerEmail] = useState(user?.email || "")
   const [processing, setProcessing] = useState(false)
   const [order, setOrder] = useState(null)
   const [error, setError] = useState("")
@@ -92,8 +93,9 @@ export default function TicketShop() {
           items: cart,
           card_last_four: cardForm.number.slice(-4),
           cardholder_name: cardForm.name,
+          buyer_name: buyerName,
+          buyer_email: buyerEmail,
           visit_date: visitDate || null,
-          guest_email: !user ? guestEmail : undefined,
         }),
       })
       const data = await res.json()
@@ -364,13 +366,18 @@ export default function TicketShop() {
                 <div style={{ background: "var(--cr-surface)", borderRadius: "16px", border: "1px solid var(--cr-border)", padding: "2rem" }}>
                   <h2 style={{ fontFamily: fh, fontSize: "1rem", fontWeight: 700, color: "#111827", margin: "0 0 1.5rem" }}>Payment Details</h2>
 
-                  {!user && (
-                    <div style={{ marginBottom: "1.25rem" }}>
-                      <label style={labelSt}>Email Address</label>
-                      <input type="email" value={guestEmail} onChange={e => setGuestEmail(e.target.value)}
-                        placeholder="your@email.com" required style={inputSt} />
+                  <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelSt}>Full Name</label>
+                      <input type="text" value={buyerName} onChange={e => setBuyerName(e.target.value)}
+                        placeholder="John Doe" required style={inputSt} />
                     </div>
-                  )}
+                    <div style={{ flex: 1 }}>
+                      <label style={labelSt}>Email Address</label>
+                      <input type="email" value={buyerEmail} onChange={e => setBuyerEmail(e.target.value)}
+                        placeholder="you@example.com" required style={inputSt} />
+                    </div>
+                  </div>
 
                   <div style={{ marginBottom: "1.25rem" }}>
                     <label style={labelSt}>Cardholder Name</label>

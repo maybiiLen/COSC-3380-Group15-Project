@@ -36,7 +36,7 @@ const optionalAuth = (req, res, next) => {
 // ─── POST purchase tickets (guest or logged-in) ───
 // Prices looked up from ticket_types table — never hardcoded
 router.post("/purchase", optionalAuth, async (req, res) => {
-  const { items, card_last_four, cardholder_name, visit_date, guest_email } = req.body
+  const { items, card_last_four, cardholder_name, visit_date, buyer_name, buyer_email } = req.body
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: "Cart is empty" })
@@ -88,12 +88,13 @@ router.post("/purchase", optionalAuth, async (req, res) => {
         `INSERT INTO ticket_purchases
           (customer_id, user_id, ticket_type, ticket_type_id, adult_qty, child_qty,
            unit_price_adult, unit_price_child, total_price, visit_date,
-           card_last_four, cardholder_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           card_last_four, cardholder_name, buyer_name, buyer_email)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING *`,
         [customerId, userId, item.ticket_type, pricing.id, adults, children,
          pricing.adult, pricing.child, total, visit_date || null,
-         card_last_four || null, cardholder_name || null]
+         card_last_four || null, cardholder_name || null,
+         buyer_name || null, buyer_email || null]
       )
       purchases.push(rows[0])
     }
@@ -157,7 +158,8 @@ router.get("/all-purchases", verifyToken, verifyRole("manager", "admin"), async 
   try {
     const { rows: details } = await pool.query(`
       SELECT tp.purchase_id, tp.ticket_type,
-        COALESCE(c.full_name, c2.full_name, 'Guest') AS customer_name,
+        COALESCE(tp.buyer_name, c.full_name, c2.full_name, tp.cardholder_name, 'Guest') AS customer_name,
+        COALESCE(tp.buyer_email, u.email, '') AS buyer_email,
         tp.adult_qty, tp.child_qty, tp.unit_price_adult, tp.unit_price_child,
         tp.total_price, tp.visit_date, tp.purchase_date,
         tp.card_last_four, tp.cardholder_name

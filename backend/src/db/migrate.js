@@ -3080,6 +3080,13 @@ const migrations = [
       EXECUTE FUNCTION fn_enforce_ticket_purchase_policy();
     `,
   },
+  {
+    name: "045_add_buyer_name_email_to_ticket_purchases",
+    sql: `
+      ALTER TABLE ticket_purchases ADD COLUMN IF NOT EXISTS buyer_name VARCHAR(255);
+      ALTER TABLE ticket_purchases ADD COLUMN IF NOT EXISTS buyer_email VARCHAR(255);
+    `,
+  },
 ];
 
 const run = async () => {

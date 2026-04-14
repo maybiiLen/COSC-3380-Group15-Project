@@ -198,8 +198,8 @@ router.get("/ticket-sales", async (req, res) => {
       SELECT
         tp.purchase_id,
         tp.ticket_type,
-        COALESCE(c.full_name, 'Guest') AS customer_name,
-        c.email AS customer_email,
+        COALESCE(tp.buyer_name, c.full_name, tp.cardholder_name, 'Guest') AS customer_name,
+        COALESCE(tp.buyer_email, c.email, '') AS customer_email,
         c.phone AS customer_phone,
         tt.ticket_category,
         tt.fast_pass,
