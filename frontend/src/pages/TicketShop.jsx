@@ -110,6 +110,20 @@ export default function TicketShop() {
     return null
   }
 
+  function logRejection(code, detail) {
+    const firstType = cart.length > 0 ? cart[0].ticket_type : "Unknown"
+    fetch(`${API_BASE_URL}/api/tickets/log-rejection`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rejection_code: code,
+        rejection_detail: detail,
+        ticket_type: firstType,
+        context_data: { visit_date: visitDate, total_qty: getTotalQty(), max_qty: maxQtyPerTxn, cart },
+      }),
+    }).catch(() => {})
+  }
+
   function addToCart(ticketId, type) {
     const existing = cart.find(c => c.ticket_type === ticketId)
     if (existing) {
@@ -427,6 +441,10 @@ export default function TicketShop() {
                     const violation = validateCart()
                     if (violation) {
                       setError(violation)
+                      // Log the rejection to the backend
+                      const codeMatch = violation.match(/POLICY VIOLATION: (\w+)/)
+                      const detailMatch = violation.split("\n")[1]
+                      if (codeMatch) logRejection(codeMatch[1], detailMatch || violation)
                       return
                     }
                     setError("")

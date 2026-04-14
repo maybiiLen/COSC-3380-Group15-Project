@@ -37,6 +37,21 @@ router.get("/purchase-limits", async (req, res) => {
   }
 })
 
+// ─── POST log a client-side policy rejection ───
+router.post("/log-rejection", async (req, res) => {
+  try {
+    const { rejection_code, rejection_detail, ticket_type, context_data } = req.body
+    await pool.query(
+      `INSERT INTO sales_rejections (customer_id, ticket_type, rejection_code, rejection_detail, context_data)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [null, ticket_type || 'Unknown', rejection_code, rejection_detail, context_data ? JSON.stringify(context_data) : null]
+    )
+    res.json({ logged: true })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+})
+
 // ─── Optional auth middleware ───
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers["authorization"]
@@ -128,6 +143,27 @@ router.post("/purchase", optionalAuth, async (req, res) => {
     console.log("Purchase error:", err.message)
     // Detect trigger rejection (SQLSTATE TP001 or message pattern)
     if (err.message && err.message.includes('Ticket purchase rejected:')) {
+      // Log rejection in a separate connection (trigger's insert was rolled back)
+      try {
+        const match = err.message.match(/rejected: (\w+) — (.+)/)
+        const rejCode = match ? match[1] : 'UNKNOWN'
+        const rejDetail = match ? match[2] : err.message
+        let contextData = null
+        try { contextData = err.detail ? JSON.parse(err.detail.replace(/'/g, '"')) : null } catch {}
+        await pool.query(
+          `INSERT INTO sales_rejections (customer_id, ticket_type, rejection_code, rejection_detail, context_data)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            contextData?.customer_id || null,
+            contextData?.ticket_type || items?.[0]?.ticket_type || 'Unknown',
+            rejCode,
+            rejDetail,
+            contextData ? JSON.stringify(contextData) : null,
+          ]
+        )
+      } catch (logErr) {
+        console.log("Failed to log rejection:", logErr.message)
+      }
       return res.status(422).json({
         message: err.message,
         trigger_rejection: true,
