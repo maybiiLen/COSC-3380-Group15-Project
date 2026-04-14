@@ -32,6 +32,8 @@ export default function TicketShop() {
   const [processing, setProcessing] = useState(false)
   const [order, setOrder] = useState(null)
   const [error, setError] = useState("")
+  const [maxQtyPerTxn, setMaxQtyPerTxn] = useState(20)
+  const [parkClosures, setParkClosures] = useState([])
 
   useEffect(() => {
     async function loadTicketTypes() {
@@ -55,7 +57,58 @@ export default function TicketShop() {
       }
     }
     loadTicketTypes()
+
+    // Load purchase limits (public endpoint)
+    fetch(`${API_BASE_URL}/api/tickets/purchase-limits`)
+      .then(r => r.ok ? r.json() : { max_qty_per_txn: 20 })
+      .then(limits => { if (limits.max_qty_per_txn) setMaxQtyPerTxn(limits.max_qty_per_txn) })
+      .catch(() => {})
+
+    // Load park closures for visit date validation
+    fetch(`${API_BASE_URL}/api/park-ops/park-closures`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (Array.isArray(data)) setParkClosures(data) })
+      .catch(() => {})
   }, [])
+
+  function getTotalQty() {
+    return cart.reduce((sum, item) => sum + item.adult_qty + item.child_qty, 0)
+  }
+
+  function isDateParkClosed(dateStr) {
+    if (!dateStr || parkClosures.length === 0) return false
+    const d = new Date(dateStr)
+    return parkClosures.some(pc => {
+      if (!pc.is_active) return false
+      const zone = (pc.zone || "").toUpperCase()
+      if (zone !== "ALL" && zone !== "PARK_WIDE" && zone !== "PARK-WIDE") return false
+      const start = new Date(pc.started_at || pc.start_date)
+      const end = pc.ended_at || pc.end_date ? new Date(pc.ended_at || pc.end_date) : new Date(start.getTime() + 365 * 86400000)
+      return d >= start && d <= end
+    })
+  }
+
+  function validateCart() {
+    const today = new Date().toISOString().split("T")[0]
+    const totalQty = getTotalQty()
+
+    if (!visitDate) {
+      return "POLICY VIOLATION: VISIT_DATE_INVALID\nPlease select a visit date before proceeding"
+    }
+    if (visitDate < today) {
+      return "POLICY VIOLATION: VISIT_DATE_INVALID\nVisit date must be today or in the future"
+    }
+    if (totalQty <= 0) {
+      return "POLICY VIOLATION: INVALID_QUANTITY\nTransaction must include at least one adult or child ticket"
+    }
+    if (totalQty > maxQtyPerTxn) {
+      return `POLICY VIOLATION: QUANTITY_EXCEEDED\nTransaction quantity ${totalQty} exceeds per-transaction maximum of ${maxQtyPerTxn}`
+    }
+    if (isDateParkClosed(visitDate)) {
+      return `POLICY VIOLATION: PARK_CLOSED_VISIT_DATE\nThe park is closed on ${visitDate}. Tickets cannot be purchased for that date.`
+    }
+    return null
+  }
 
   function addToCart(ticketId, type) {
     const existing = cart.find(c => c.ticket_type === ticketId)
@@ -103,7 +156,7 @@ export default function TicketShop() {
       else if (data.trigger_rejection) {
         // Extract the rejection code from the trigger message
         const match = data.message.match(/rejected: (\w+) — (.+)/)
-        setError(`🚫 POLICY VIOLATION: ${match ? match[1] : 'UNKNOWN'}\n${match ? match[2] : data.message}`)
+        setError(`POLICY VIOLATION: ${match ? match[1] : 'UNKNOWN'}\n${match ? match[2] : data.message}`)
       }
       else { setError(data.message || "Purchase failed") }
     } catch { setError("Network error — please try again") }
@@ -325,11 +378,40 @@ export default function TicketShop() {
                   })}
                 </div>
 
-                <div style={{ background: "var(--cr-surface)", borderRadius: "14px", border: "1px solid var(--cr-border)", padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
-                  <label style={labelSt}>Planned Visit Date (optional)</label>
-                  <input type="date" value={visitDate} onChange={e => setVisitDate(e.target.value)}
+                {/* Quantity warning */}
+                {getTotalQty() > maxQtyPerTxn && (
+                  <div style={{ padding: "12px 16px", borderRadius: "10px", background: "rgba(229,57,53,0.08)", border: "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.82rem", color: "#E53935", marginBottom: "1rem", fontWeight: 600 }}>
+                    POLICY VIOLATION: QUANTITY_EXCEEDED — {getTotalQty()} tickets exceeds the per-transaction maximum of {maxQtyPerTxn}
+                  </div>
+                )}
+
+                {/* Visit date */}
+                <div style={{ background: "var(--cr-surface)", borderRadius: "14px", border: `1px solid ${!visitDate || visitDate < new Date().toISOString().split("T")[0] || isDateParkClosed(visitDate) ? "var(--cr-red)" : "var(--cr-border)"}`, padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
+                  <label style={labelSt}>Visit Date <span style={{ color: "var(--cr-red)" }}>*</span></label>
+                  <input type="date" value={visitDate} onChange={e => { setVisitDate(e.target.value); setError("") }}
+                    min={new Date().toISOString().split("T")[0]}
+                    required
                     style={{ ...inputSt, width: "auto", colorScheme: "light" }} />
+                  {visitDate && visitDate < new Date().toISOString().split("T")[0] && (
+                    <p style={{ fontFamily: f, fontSize: "0.8rem", color: "#E53935", marginTop: "0.5rem", fontWeight: 600 }}>
+                      POLICY VIOLATION: VISIT_DATE_INVALID — Visit date must be today or in the future
+                    </p>
+                  )}
+                  {visitDate && isDateParkClosed(visitDate) && !(visitDate < new Date().toISOString().split("T")[0]) && (
+                    <p style={{ fontFamily: f, fontSize: "0.8rem", color: "#E53935", marginTop: "0.5rem", fontWeight: 600 }}>
+                      POLICY VIOLATION: PARK_CLOSED_VISIT_DATE — The park is closed on this date. Please select a different date.
+                    </p>
+                  )}
+                  {!visitDate && (
+                    <p style={{ fontFamily: f, fontSize: "0.75rem", color: "#999", marginTop: "0.5rem" }}>
+                      Required — select the date you plan to visit the park
+                    </p>
+                  )}
                 </div>
+
+                {error && (
+                  <div style={{ padding: "14px 18px", borderRadius: "10px", background: "rgba(229,57,53,0.08)", border: "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.85rem", color: "#E53935", marginBottom: "1rem", whiteSpace: "pre-line", fontWeight: 600 }}>{error}</div>
+                )}
 
                 <div style={{
                   padding: "1.25rem 1.5rem", background: "var(--cr-surface)",
@@ -339,12 +421,22 @@ export default function TicketShop() {
                   <div>
                     <div style={{ fontFamily: f, fontSize: "0.65rem", color: "#aaa", textTransform: "uppercase", letterSpacing: "1px" }}>Order Total</div>
                     <div style={{ fontFamily: fh, fontSize: "2rem", fontWeight: 800, color: "#111827" }}>${getTotal()}</div>
+                    <div style={{ fontFamily: f, fontSize: "0.7rem", color: "#999", marginTop: "2px" }}>{getTotalQty()} ticket(s) — max {maxQtyPerTxn} per transaction</div>
                   </div>
-                  <button onClick={() => setStep("checkout")} style={{
+                  <button onClick={() => {
+                    const violation = validateCart()
+                    if (violation) {
+                      setError(violation)
+                      return
+                    }
+                    setError("")
+                    setStep("checkout")
+                  }} style={{
                     fontFamily: f, fontSize: "0.9rem", fontWeight: 700,
-                    padding: "14px 32px", background: "var(--cr-gradient-brand)",
+                    padding: "14px 32px",
+                    background: !validateCart() ? "var(--cr-gradient-brand)" : "linear-gradient(135deg, #999, #777)",
                     color: "white", border: "none", borderRadius: "50px", cursor: "pointer",
-                    boxShadow: "0 4px 20px rgba(200,16,46,0.4)",
+                    boxShadow: !validateCart() ? "0 4px 20px rgba(200,16,46,0.4)" : "none",
                   }}>Proceed to Checkout →</button>
                 </div>
               </>
@@ -412,7 +504,7 @@ export default function TicketShop() {
                   </div>
 
                   {error && (
-                    <div style={{ padding: "14px 18px", borderRadius: "10px", background: error.includes("POLICY VIOLATION") ? "rgba(229,57,53,0.2)" : "rgba(229,57,53,0.12)", border: error.includes("POLICY VIOLATION") ? "2px solid rgba(229,57,53,0.5)" : "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.85rem", color: "#EF9A9A", marginBottom: "1rem", whiteSpace: "pre-line" }}>{error}</div>
+                    <div style={{ padding: "14px 18px", borderRadius: "10px", background: error.includes("POLICY VIOLATION") ? "rgba(229,57,53,0.15)" : "rgba(229,57,53,0.08)", border: error.includes("POLICY VIOLATION") ? "2px solid rgba(229,57,53,0.5)" : "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.85rem", color: "#E53935", marginBottom: "1rem", whiteSpace: "pre-line", fontWeight: 600 }}>{error}</div>
                   )}
 
                   <button type="submit" disabled={processing} style={{

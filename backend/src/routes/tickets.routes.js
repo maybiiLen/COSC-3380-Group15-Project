@@ -20,6 +20,23 @@ router.get("/types", async (req, res) => {
   }
 })
 
+// ─── GET public purchase limits (no auth required) ───
+router.get("/purchase-limits", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT key, value FROM policy_config WHERE key IN ('purchase_max_qty_per_txn', 'purchase_rate_limit_24h')`
+    )
+    const limits = { max_qty_per_txn: 20, rate_limit_24h: 10 }
+    for (const r of rows) {
+      if (r.key === "purchase_max_qty_per_txn") limits.max_qty_per_txn = parseInt(r.value)
+      if (r.key === "purchase_rate_limit_24h") limits.rate_limit_24h = parseInt(r.value)
+    }
+    res.json(limits)
+  } catch {
+    res.json({ max_qty_per_txn: 20, rate_limit_24h: 10 })
+  }
+})
+
 // ─── Optional auth middleware ───
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers["authorization"]
