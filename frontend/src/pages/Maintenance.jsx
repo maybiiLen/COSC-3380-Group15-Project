@@ -972,8 +972,14 @@ function TicketPolicyPanel() {
         authFetch(`${API_BASE_URL}/api/tickets/policy/rejections`),
         authFetch(`${API_BASE_URL}/api/tickets/policy/config`),
       ])
-      setRejections(await rejRes.json())
-      setConfig(await cfgRes.json())
+      if (rejRes.ok) {
+        const rejData = await rejRes.json()
+        setRejections(Array.isArray(rejData) ? rejData : [])
+      }
+      if (cfgRes.ok) {
+        const cfgData = await cfgRes.json()
+        setConfig(Array.isArray(cfgData) ? cfgData : [])
+      }
       setLoaded(true)
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
