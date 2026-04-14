@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { API_BASE_URL } from "../utils/api"
 import cougarrideLogoMd from "../assets/cougarride-logo-md.png"
+import authBg from "../assets/auth-bg.jpg"
 
 const f = "'DM Sans', sans-serif"
 const fh = "var(--font-heading)"
@@ -92,7 +93,7 @@ export default function AuthPage() {
       <div style={{
         flex: "0 0 45%", display: "flex", flexDirection: "column",
         justifyContent: "flex-end", alignItems: "center",
-        backgroundImage: "url('/src/assets/auth-bg.jpg')",
+        backgroundImage: `url(${authBg})`,
         backgroundSize: "cover", backgroundPosition: "center",
         position: "relative", overflow: "hidden",
         padding: "3rem",
