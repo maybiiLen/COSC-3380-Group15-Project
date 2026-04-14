@@ -25,12 +25,18 @@ async function authFetch(url, options = {}) {
       if (refreshRes.ok) {
         const { accessToken } = await refreshRes.json()
         localStorage.setItem("accessToken", accessToken)
-        // Retry original request with new token
         opts.headers.Authorization = `Bearer ${accessToken}`
         res = await fetch(url, opts)
+      } else {
+        // Refresh failed — clear stale session and redirect to login
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("user")
+        window.location.href = "/login"
       }
     } catch {
-      // Refresh failed — return original 401 response
+      localStorage.removeItem("accessToken")
+      localStorage.removeItem("user")
+      window.location.href = "/login"
     }
   }
 
