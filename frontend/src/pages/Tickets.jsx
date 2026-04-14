@@ -138,7 +138,6 @@ export default function Tickets() {
           <tr>
             <th className="px-4 py-3 text-left font-medium text-gray-500">ID</th>
             <th className="px-4 py-3 text-left font-medium text-gray-500">Customer</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-500">Email</th>
             <th className="px-4 py-3 text-left font-medium text-gray-500">Type</th>
             <th className="px-4 py-3 text-left font-medium text-gray-500">Adults</th>
             <th className="px-4 py-3 text-left font-medium text-gray-500">Children</th>
@@ -149,19 +148,18 @@ export default function Tickets() {
         </thead>
         <tbody className="divide-y divide-gray-100">
           {loading && (
-            <tr><td colSpan="9" className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>
+            <tr><td colSpan="8" className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>
           )}
           {!loading && error && (
-            <tr><td colSpan="9" className="px-4 py-6 text-center text-red-500">{error}</td></tr>
+            <tr><td colSpan="8" className="px-4 py-6 text-center text-red-500">{error}</td></tr>
           )}
           {!loading && !error && data.details.length === 0 && (
-            <tr><td colSpan="9" className="px-4 py-6 text-center text-gray-400">No transactions found. Try adjusting your filters or check back later.</td></tr>
+            <tr><td colSpan="8" className="px-4 py-6 text-center text-gray-400">No transactions found. Try adjusting your filters or check back later.</td></tr>
           )}
           {data.details.map(d => (
             <tr key={d.purchase_id} className="hover:bg-gray-50">
               <td className="px-4 py-3 text-gray-600">#{d.purchase_id}</td>
-              <td className="px-4 py-3 font-medium text-gray-900">{d.customer_name}</td>
-              <td className="px-4 py-3 text-gray-500">{d.buyer_email || "—"}</td>
+              <td className="px-4 py-3 font-medium text-gray-900">{d.buyer_email || d.customer_name || "—"}</td>
               <td className="px-4 py-3">
                 <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium
                   ${d.ticket_type === "General Admission" ? "bg-blue-100 text-blue-700" : ""}

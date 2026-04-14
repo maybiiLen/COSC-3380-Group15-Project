@@ -212,7 +212,7 @@ router.get("/all-purchases", verifyToken, verifyRole("manager", "admin"), async 
     const { rows: details } = await pool.query(`
       SELECT tp.purchase_id, tp.ticket_type,
         COALESCE(tp.buyer_name, c.full_name, c2.full_name, tp.cardholder_name, 'Guest') AS customer_name,
-        COALESCE(tp.buyer_email, u.email, '') AS buyer_email,
+        COALESCE(tp.buyer_email, c.email, u.email, '') AS buyer_email,
         tp.adult_qty, tp.child_qty, tp.unit_price_adult, tp.unit_price_child,
         tp.total_price, tp.visit_date, tp.purchase_date,
         tp.card_last_four, tp.cardholder_name

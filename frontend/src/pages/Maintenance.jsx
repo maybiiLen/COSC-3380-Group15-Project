@@ -15,12 +15,6 @@ export default function Maintenance() {
   const [search, setSearch] = useState("")
   const [isOpen, setIsOpen] = useState(false)
   const [editId, setEditId] = useState(null)
-  const [escalating, setEscalating] = useState(false)
-  const [escalationResult, setEscalationResult] = useState(null)
-  const [autoRunning, setAutoRunning] = useState(false)
-  const [autoLog, setAutoLog] = useState([])
-  const [cronRunning, setCronRunning] = useState(false)
-  const [cronHistory, setCronHistory] = useState([])
   const [formData, setFormData] = useState({
     ride_id: "",
     employee_id: "",
@@ -33,21 +27,7 @@ export default function Maintenance() {
     fetchRequests()
     fetchRides()
     fetchEmployees()
-    checkAutoStatus()
-    checkCronStatus()
   }, [])
-
-  // Poll for updates when auto-escalation or pg_cron is running
-  useEffect(() => {
-    if (!autoRunning && !cronRunning) return
-    const poller = setInterval(() => {
-      checkAutoStatus()
-      if (cronRunning) checkCronStatus()
-      fetchRequests()
-      fetchRides()
-    }, 5000)
-    return () => clearInterval(poller)
-  }, [autoRunning, cronRunning])
 
   async function fetchRequests() {
     try {
@@ -155,89 +135,6 @@ export default function Maintenance() {
     }
   }
 
-  async function checkAutoStatus() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/maintenance/escalate/auto-status`)
-      const data = await res.json()
-      setAutoRunning(data.running)
-      setAutoLog(data.log || [])
-    } catch (err) { /* ignore */ }
-  }
-
-  async function toggleAutoEscalation() {
-    try {
-      if (autoRunning) {
-        const res = await fetch(`${API_BASE_URL}/api/maintenance/escalate/auto-stop`, { method: "POST" })
-        const data = await res.json()
-        setAutoRunning(false)
-        setAutoLog(data.log || [])
-      } else {
-        const res = await fetch(`${API_BASE_URL}/api/maintenance/escalate/auto-start`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ interval_seconds: 10, threshold_seconds: 10 })
-        })
-        const data = await res.json()
-        setAutoRunning(data.running)
-      }
-      fetchRequests()
-      fetchRides()
-    } catch (err) {
-      console.log("Auto-escalation toggle error:", err)
-    }
-  }
-
-  async function checkCronStatus() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/maintenance/escalate/cron-status`)
-      const data = await res.json()
-      setCronRunning(data.running || false)
-      setCronHistory(data.history || [])
-    } catch (err) { /* pg_cron may not be available */ }
-  }
-
-  async function toggleCron() {
-    try {
-      if (cronRunning) {
-        await fetch(`${API_BASE_URL}/api/maintenance/escalate/cron-stop`, { method: "POST" })
-        setCronRunning(false)
-      } else {
-        const res = await fetch(`${API_BASE_URL}/api/maintenance/escalate/cron-start`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ threshold_seconds: 10 })
-        })
-        const data = await res.json()
-        setCronRunning(data.running)
-      }
-      fetchRequests()
-      fetchRides()
-    } catch (err) {
-      console.log("pg_cron toggle error:", err)
-    }
-  }
-
-  async function handleEscalate() {
-    setEscalating(true)
-    setEscalationResult(null)
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/maintenance/escalate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threshold_seconds: 10 })
-      })
-      const data = await res.json()
-      setEscalationResult(data)
-      fetchRequests()
-      fetchRides()
-      setTimeout(() => setEscalationResult(null), 8000)
-    } catch (err) {
-      console.log("Escalation error:", err)
-    } finally {
-      setEscalating(false)
-    }
-  }
-
   const filteredRequests = requests.filter((req) => {
     const matchesSearch =
       req.ride_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -300,94 +197,8 @@ export default function Maintenance() {
             </svg>
             New Request
           </button>
-          {["manager", "admin"].includes(user?.role) && (
-            <button
-              className="flex items-center justify-center gap-1 border border-orange-300 rounded-lg bg-orange-50 text-orange-700 px-3 py-2 hover:bg-orange-100 cursor-pointer disabled:opacity-50"
-              onClick={handleEscalate}
-              disabled={escalating}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                <path d="M12 19V5" />
-                <path d="m5 12 7-7 7 7" />
-              </svg>
-              {escalating ? "Escalating..." : "Escalate Once"}
-            </button>
-          )}
-          {["manager", "admin"].includes(user?.role) && (
-            <button
-              className={`flex items-center justify-center gap-1 border rounded-lg px-3 py-2 cursor-pointer ${
-                autoRunning
-                  ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
-                  : 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100'
-              }`}
-              onClick={toggleAutoEscalation}
-            >
-              {autoRunning ? (
-                <>
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                  </span>
-                  Stop Auto
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                  Auto (10s)
-                </>
-              )}
-            </button>
-          )}
         </div>
       </div>
-
-      {/* Escalation Result Banner */}
-      {escalationResult && (
-        <div className={`mt-4 rounded-xl border p-4 ${escalationResult.count > 0 ? 'border-orange-200 bg-orange-50' : 'border-green-200 bg-green-50'}`}>
-          <p className={`text-sm font-semibold ${escalationResult.count > 0 ? 'text-orange-700' : 'text-green-700'}`}>
-            {escalationResult.message}
-          </p>
-          {escalationResult.escalated?.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {escalationResult.escalated.map((e, i) => (
-                <p key={i} className="text-xs text-orange-600">
-                  Request #{e.request_id}: {e.old_priority} → {e.new_priority} (aged {Math.round(e.age_seconds)}s)
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Auto-Escalation Status Panel */}
-      {autoRunning && (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-              </span>
-              <p className="text-sm font-semibold text-amber-700">Auto-Escalation Active — checking every 10s</p>
-            </div>
-            <span className="text-xs text-amber-500">{autoLog.length} check(s) run</span>
-          </div>
-          {autoLog.filter(e => e.count > 0).length > 0 && (
-            <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-              {autoLog.filter(e => e.count > 0).slice(-10).reverse().map((entry, i) => (
-                <div key={i} className="text-xs text-amber-600">
-                  <span className="text-amber-400">{new Date(entry.ran_at).toLocaleTimeString()}</span>
-                  {" — "}
-                  {entry.escalated.map(e => `#${e.request_id} ${e.old_priority}→${e.new_priority}`).join(", ")}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Delete Confirmation Modal */}
       {deleteId && (
