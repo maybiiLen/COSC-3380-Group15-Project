@@ -98,6 +98,11 @@ export default function TicketShop() {
       })
       const data = await res.json()
       if (res.ok) { setOrder(data); setStep("confirmation"); setCart([]) }
+      else if (data.trigger_rejection) {
+        // Extract the rejection code from the trigger message
+        const match = data.message.match(/rejected: (\w+) — (.+)/)
+        setError(`🚫 POLICY VIOLATION: ${match ? match[1] : 'UNKNOWN'}\n${match ? match[2] : data.message}`)
+      }
       else { setError(data.message || "Purchase failed") }
     } catch { setError("Network error — please try again") }
     finally { setProcessing(false) }
@@ -209,7 +214,7 @@ export default function TicketShop() {
 
                   <div style={{ marginTop: "auto" }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", marginBottom: "1rem" }}>
-                      <span style={{ fontFamily: fh, fontSize: "2rem", fontWeight: 800, color: "white" }}>${t.price}</span>
+                      <span style={{ fontFamily: fh, fontSize: "2rem", fontWeight: 800, color: "#111827" }}>${t.price}</span>
                       <span style={{ fontFamily: f, fontSize: "0.75rem", color: "#999" }}>adult</span>
                       <span style={{ fontFamily: f, fontSize: "0.75rem", color: "#bbb", marginLeft: "0.5rem" }}>${t.child} child</span>
                     </div>
@@ -251,7 +256,7 @@ export default function TicketShop() {
                   🛒 {cart.reduce((s, c) => s + c.adult_qty + c.child_qty, 0)} ticket(s) in cart
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
-                  <span style={{ fontFamily: fh, fontSize: "1.5rem", fontWeight: 800, color: "white" }}>${getTotal()}</span>
+                  <span style={{ fontFamily: fh, fontSize: "1.5rem", fontWeight: 800, color: "#111827" }}>${getTotal()}</span>
                   <button onClick={() => setStep("cart")} style={{
                     fontFamily: f, fontSize: "0.85rem", fontWeight: 700,
                     padding: "12px 28px", background: "var(--cr-gradient-brand)",
@@ -270,7 +275,7 @@ export default function TicketShop() {
             <button onClick={() => setStep("browse")} style={{ fontFamily: f, fontSize: "0.8rem", color: "#999", background: "transparent", border: "none", cursor: "pointer", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "4px" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg> Back to Tickets
             </button>
-            <h1 style={{ fontFamily: fh, fontSize: "1.8rem", fontWeight: 800, color: "white", margin: "0 0 2rem" }}>Your Cart</h1>
+            <h1 style={{ fontFamily: fh, fontSize: "1.8rem", fontWeight: 800, color: "#111827", margin: "0 0 2rem" }}>Your Cart</h1>
 
             {cart.length === 0 ? (
               <div style={{ textAlign: "center", padding: "3rem", background: "var(--cr-surface)", borderRadius: "16px", border: "1px solid var(--cr-border)" }}>
@@ -290,14 +295,14 @@ export default function TicketShop() {
                         alignItems: "center", flexWrap: "wrap", gap: "1rem",
                       }}>
                         <div>
-                          <h3 style={{ fontFamily: fh, fontSize: "1.05rem", fontWeight: 700, color: "white", margin: "0 0 0.5rem" }}>{t.icon} {item.ticket_type}</h3>
+                          <h3 style={{ fontFamily: fh, fontSize: "1.05rem", fontWeight: 700, color: "#111827", margin: "0 0 0.5rem" }}>{t.icon} {item.ticket_type}</h3>
                           <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
                             {/* Adult qty */}
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                               <span style={{ fontFamily: f, fontSize: "0.8rem", color: "#777" }}>Adults</span>
                               <div style={{ display: "flex", alignItems: "center", background: "var(--cr-border)", borderRadius: "8px" }}>
                                 <button onClick={() => updateCart(item.ticket_type, "adult_qty", item.adult_qty - 1)} style={qtyBtnStyle}>−</button>
-                                <span style={{ fontFamily: f, fontWeight: 600, color: "white", minWidth: 20, textAlign: "center" }}>{item.adult_qty}</span>
+                                <span style={{ fontFamily: f, fontWeight: 600, color: "#111827", minWidth: 20, textAlign: "center" }}>{item.adult_qty}</span>
                                 <button onClick={() => updateCart(item.ticket_type, "adult_qty", item.adult_qty + 1)} style={qtyBtnStyle}>+</button>
                               </div>
                             </div>
@@ -306,13 +311,13 @@ export default function TicketShop() {
                               <span style={{ fontFamily: f, fontSize: "0.8rem", color: "#777" }}>Children</span>
                               <div style={{ display: "flex", alignItems: "center", background: "var(--cr-border)", borderRadius: "8px" }}>
                                 <button onClick={() => updateCart(item.ticket_type, "child_qty", item.child_qty - 1)} style={qtyBtnStyle}>−</button>
-                                <span style={{ fontFamily: f, fontWeight: 600, color: "white", minWidth: 20, textAlign: "center" }}>{item.child_qty}</span>
+                                <span style={{ fontFamily: f, fontWeight: 600, color: "#111827", minWidth: 20, textAlign: "center" }}>{item.child_qty}</span>
                                 <button onClick={() => updateCart(item.ticket_type, "child_qty", item.child_qty + 1)} style={qtyBtnStyle}>+</button>
                               </div>
                             </div>
                           </div>
                         </div>
-                        <span style={{ fontFamily: fh, fontSize: "1.3rem", fontWeight: 700, color: "white" }}>${subtotal}</span>
+                        <span style={{ fontFamily: fh, fontSize: "1.3rem", fontWeight: 700, color: "#111827" }}>${subtotal}</span>
                       </div>
                     )
                   })}
@@ -321,7 +326,7 @@ export default function TicketShop() {
                 <div style={{ background: "var(--cr-surface)", borderRadius: "14px", border: "1px solid var(--cr-border)", padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
                   <label style={labelSt}>Planned Visit Date (optional)</label>
                   <input type="date" value={visitDate} onChange={e => setVisitDate(e.target.value)}
-                    style={{ ...inputSt, width: "auto", colorScheme: "dark" }} />
+                    style={{ ...inputSt, width: "auto", colorScheme: "light" }} />
                 </div>
 
                 <div style={{
@@ -331,7 +336,7 @@ export default function TicketShop() {
                 }}>
                   <div>
                     <div style={{ fontFamily: f, fontSize: "0.65rem", color: "#aaa", textTransform: "uppercase", letterSpacing: "1px" }}>Order Total</div>
-                    <div style={{ fontFamily: fh, fontSize: "2rem", fontWeight: 800, color: "white" }}>${getTotal()}</div>
+                    <div style={{ fontFamily: fh, fontSize: "2rem", fontWeight: 800, color: "#111827" }}>${getTotal()}</div>
                   </div>
                   <button onClick={() => setStep("checkout")} style={{
                     fontFamily: f, fontSize: "0.9rem", fontWeight: 700,
@@ -351,13 +356,13 @@ export default function TicketShop() {
             <button onClick={() => setStep("cart")} style={{ fontFamily: f, fontSize: "0.8rem", color: "#999", background: "transparent", border: "none", cursor: "pointer", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "4px" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg> Back to Cart
             </button>
-            <h1 style={{ fontFamily: fh, fontSize: "1.8rem", fontWeight: 800, color: "white", margin: "0 0 0.5rem" }}>Checkout</h1>
+            <h1 style={{ fontFamily: fh, fontSize: "1.8rem", fontWeight: 800, color: "#111827", margin: "0 0 0.5rem" }}>Checkout</h1>
             <p style={{ fontFamily: f, fontSize: "0.85rem", color: "#999", marginBottom: "2rem" }}>Complete your purchase — your tickets will be ready instantly.</p>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "2rem", alignItems: "start" }}>
               <form onSubmit={handleCheckout}>
                 <div style={{ background: "var(--cr-surface)", borderRadius: "16px", border: "1px solid var(--cr-border)", padding: "2rem" }}>
-                  <h2 style={{ fontFamily: fh, fontSize: "1rem", fontWeight: 700, color: "white", margin: "0 0 1.5rem" }}>Payment Details</h2>
+                  <h2 style={{ fontFamily: fh, fontSize: "1rem", fontWeight: 700, color: "#111827", margin: "0 0 1.5rem" }}>Payment Details</h2>
 
                   {!user && (
                     <div style={{ marginBottom: "1.25rem" }}>
@@ -400,7 +405,7 @@ export default function TicketShop() {
                   </div>
 
                   {error && (
-                    <div style={{ padding: "10px 14px", borderRadius: "10px", background: "rgba(229,57,53,0.12)", border: "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.8rem", color: "#EF9A9A", marginBottom: "1rem" }}>{error}</div>
+                    <div style={{ padding: "14px 18px", borderRadius: "10px", background: error.includes("POLICY VIOLATION") ? "rgba(229,57,53,0.2)" : "rgba(229,57,53,0.12)", border: error.includes("POLICY VIOLATION") ? "2px solid rgba(229,57,53,0.5)" : "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.85rem", color: "#EF9A9A", marginBottom: "1rem", whiteSpace: "pre-line" }}>{error}</div>
                   )}
 
                   <button type="submit" disabled={processing} style={{
@@ -413,19 +418,19 @@ export default function TicketShop() {
                     {processing ? "Processing..." : `Pay $${getTotal()}`}
                   </button>
 
-                  <p style={{ fontFamily: f, fontSize: "0.65rem", color: "#bbb", textAlign: "center", marginTop: "1rem" }}>
+                  <p style={{ fontFamily: f, fontSize: "0.65rem", color: "#9ca3af", textAlign: "center", marginTop: "1rem" }}>
                     This is a demo — no real charges will be made.
                   </p>
                 </div>
               </form>
 
               <div style={{ background: "var(--cr-surface)", borderRadius: "16px", border: "1px solid var(--cr-border)", padding: "1.5rem" }}>
-                <h3 style={{ fontFamily: fh, fontSize: "0.9rem", fontWeight: 700, color: "white", margin: "0 0 1rem" }}>Order Summary</h3>
+                <h3 style={{ fontFamily: fh, fontSize: "0.9rem", fontWeight: 700, color: "#111827", margin: "0 0 1rem" }}>Order Summary</h3>
                 {cart.map(item => {
                   const t = ticketOptions.find(o => o.id === item.ticket_type)
                   return (
                     <div key={item.ticket_type} style={{ marginBottom: "0.75rem", paddingBottom: "0.75rem", borderBottom: "1px solid var(--cr-border)" }}>
-                      <div style={{ fontFamily: f, fontSize: "0.85rem", fontWeight: 600, color: "white" }}>{item.ticket_type}</div>
+                      <div style={{ fontFamily: f, fontSize: "0.85rem", fontWeight: 600, color: "#111827" }}>{item.ticket_type}</div>
                       {item.adult_qty > 0 && <div style={{ fontFamily: f, fontSize: "0.75rem", color: "#999" }}>{item.adult_qty}× Adult @ ${t.price}</div>}
                       {item.child_qty > 0 && <div style={{ fontFamily: f, fontSize: "0.75rem", color: "#999" }}>{item.child_qty}× Child @ ${t.child}</div>}
                     </div>
@@ -433,8 +438,8 @@ export default function TicketShop() {
                 })}
                 {visitDate && <div style={{ fontFamily: f, fontSize: "0.75rem", color: "#999", marginBottom: "0.75rem" }}>Visit: {visitDate}</div>}
                 <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "0.5rem" }}>
-                  <span style={{ fontFamily: f, fontSize: "0.9rem", fontWeight: 700, color: "white" }}>Total</span>
-                  <span style={{ fontFamily: fh, fontSize: "1.2rem", fontWeight: 700, color: "white" }}>${getTotal()}</span>
+                  <span style={{ fontFamily: f, fontSize: "0.9rem", fontWeight: 700, color: "#111827" }}>Total</span>
+                  <span style={{ fontFamily: fh, fontSize: "1.2rem", fontWeight: 700, color: "#111827" }}>${getTotal()}</span>
                 </div>
               </div>
             </div>
@@ -445,9 +450,9 @@ export default function TicketShop() {
         {step === "confirmation" && order && (
           <div style={{ textAlign: "center", padding: "4rem 2rem", animation: "fadeInUp 0.5s ease-out" }}>
             <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>🎉</div>
-            <h1 style={{ fontFamily: fh, fontSize: "2.2rem", fontWeight: 900, color: "white", margin: "0 0 0.5rem" }}>You're All Set!</h1>
+            <h1 style={{ fontFamily: fh, fontSize: "2.2rem", fontWeight: 900, color: "#111827", margin: "0 0 0.5rem" }}>You're All Set!</h1>
             <p style={{ fontFamily: f, fontSize: "1rem", color: "#777", marginBottom: "2rem" }}>
-              Your tickets have been purchased. Order total: <strong style={{ color: "white" }}>${order.order_total}</strong>
+              Your tickets have been purchased. Order total: <strong style={{ color: "#111827" }}>${order.order_total}</strong>
             </p>
 
             <div style={{ background: "var(--cr-surface)", borderRadius: "16px", border: "1px solid var(--cr-border)", padding: "2rem", maxWidth: "500px", margin: "0 auto 2rem", textAlign: "left" }}>
@@ -455,7 +460,7 @@ export default function TicketShop() {
               {order.purchases.map((p, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0", borderBottom: "1px solid var(--cr-border)", fontFamily: f, fontSize: "0.85rem" }}>
                   <span style={{ color: "#555" }}>{p.ticket_type} ({p.adult_qty}A {p.child_qty > 0 ? `+ ${p.child_qty}C` : ""})</span>
-                  <span style={{ color: "white", fontWeight: 600 }}>${Number(p.total_price).toFixed(2)}</span>
+                  <span style={{ color: "#111827", fontWeight: 600 }}>${Number(p.total_price).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -481,17 +486,17 @@ export default function TicketShop() {
 }
 
 const qtyBtnStyle = {
-  width: 30, height: 30, background: "transparent", border: "none", color: "white", cursor: "pointer", fontSize: "1rem",
+  width: 30, height: 30, background: "transparent", border: "none", color: "#111827", cursor: "pointer", fontSize: "1rem",
 }
 
 const labelSt = {
   fontFamily: "'DM Sans', sans-serif", fontSize: "0.73rem", fontWeight: 600,
-  color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "1px",
+  color: "#6b7280", textTransform: "uppercase", letterSpacing: "1px",
   display: "block", marginBottom: "6px",
 }
 const inputSt = {
   width: "100%", padding: "12px 14px", background: "var(--cr-surface-light)",
   border: "1px solid var(--cr-border-light)", borderRadius: "10px",
-  color: "white", fontFamily: "'DM Sans', sans-serif", fontSize: "0.9rem",
+  color: "#111827", fontFamily: "'DM Sans', sans-serif", fontSize: "0.9rem",
   outline: "none", boxSizing: "border-box", transition: "border-color 0.2s",
 }

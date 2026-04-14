@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { API_BASE_URL } from '../utils/api'
 
 const REPORTS = [
-  { id: 'maintenance', label: 'Maintenance Report', desc: 'Maintenance requests by ride and employee', tables: ['maintenance_requests', 'rides', 'employees'] },
+  { id: 'maintenance', label: 'Maintenance Report', desc: 'Maintenance requests by ride, employee, closures, and alerts', tables: ['maintenance_requests', 'rides', 'employees', 'park_closures', 'notifications'] },
   { id: 'ticketSales', label: 'Ticket Sales Report', desc: 'Ticket purchases, revenue, and customer data', tables: ['ticket_purchases', 'customers', 'ticket_types'] },
   { id: 'employeeActivity', label: 'Employee Activity Report', desc: 'Employee task assignments and performance', tables: ['employees', 'maintenance_requests', 'rides'] },
 ]
@@ -99,7 +99,7 @@ export default function Analytics() {
       {/* Report Selection */}
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {REPORTS.map(r => (
-          <button key={r.id} onClick={() => { setSelectedReport(r.id); setShowResults(false); setReportData(null); setShowRawTables(false) }}
+          <button key={r.id} onClick={() => { setSelectedReport(r.id); setShowResults(false); setReportData(null) }}
             className={`text-left p-4 rounded-xl border cursor-pointer transition-all ${
               selectedReport === r.id
                 ? 'border-[#C8102E] bg-red-50 shadow-md'
@@ -245,11 +245,11 @@ export default function Analytics() {
           {/* ─── Maintenance Report Results ─── */}
           {selectedReport === 'maintenance' && (
             <>
-              <ReportTable title="Maintenance Summary by Ride" columns={['Ride', 'Total', 'Pending', 'In Progress', 'Completed', 'Completion %', 'Avg Hours', 'Downtime']}
-                rows={reportData.summary?.map(r => [r.ride_name, r.total_requests, r.pending, r.in_progress, r.completed, `${r.completion_rate_pct}%`, r.avg_hours_to_complete ?? '—', `${r.total_downtime_hours ?? '—'}h`])}
-                totals={reportData.totals ? ['TOTAL', reportData.totals.total_requests, reportData.totals.pending, reportData.totals.in_progress, reportData.totals.completed, `${reportData.totals.completion_rate_pct}%`, reportData.totals.avg_hours_to_complete ?? '—', `${reportData.totals.total_downtime_hours ?? '—'}h`] : null} />
-              <ReportTable title="Maintenance Detail" columns={['ID', 'Ride', 'Description', 'Priority', 'Status', 'Assigned To', 'Date']}
-                rows={reportData.details?.map(r => [`#${r.request_id}`, r.ride_name, r.description, r.priority, r.status, r.assigned_to, new Date(r.request_date).toLocaleDateString()])} />
+              <ReportTable title="Maintenance Summary by Ride" columns={['Ride', 'Total', 'Pending', 'In Progress', 'Completed', 'Completion %', 'Avg Hours', 'Min Hours', 'Max Hours', 'Total Downtime', 'Employees', 'Closure Related', 'Alerts']}
+                rows={reportData.summary?.map(r => [r.ride_name, r.total_requests, r.pending, r.in_progress, r.completed, `${r.completion_rate_pct}%`, r.avg_hours_to_complete ?? '—', r.min_hours ?? '—', r.max_hours ?? '—', `${r.total_downtime_hours ?? '—'}h`, r.distinct_employees, r.closure_related, r.total_alerts])}
+                totals={reportData.totals ? ['TOTAL', reportData.totals.total_requests, reportData.totals.pending, reportData.totals.in_progress, reportData.totals.completed, `${reportData.totals.completion_rate_pct}%`, reportData.totals.avg_hours_to_complete ?? '—', reportData.totals.min_hours ?? '—', reportData.totals.max_hours ?? '—', `${reportData.totals.total_downtime_hours ?? '—'}h`, reportData.totals.distinct_employees, reportData.totals.closure_related, reportData.totals.total_alerts] : null} />
+              <ReportTable title="Maintenance Detail" columns={['ID', 'Ride', 'Description', 'Priority', 'Status', 'Assigned To', 'Request Date', 'Completed At', 'Hours to Complete', 'Zone Closed', 'Closure Type', 'Alerts']}
+                rows={reportData.details?.map(r => [`#${r.request_id}`, r.ride_name, r.description, r.priority, r.status, r.assigned_to, new Date(r.request_date).toLocaleDateString(), r.completed_at ? new Date(r.completed_at).toLocaleDateString() : '—', r.hours_to_complete ?? '—', r.zone_was_closed ? 'Yes' : 'No', r.closure_type || '—', r.alerts_sent])} />
             </>
           )}
 
@@ -258,20 +258,20 @@ export default function Analytics() {
             <>
               <ReportTable title="Sales by Ticket Type" columns={['Type', 'Category', 'Fast Pass', 'Price', 'Sold', 'Revenue', 'Revenue %', 'Customers', 'Orders', 'Avg Order']}
                 rows={reportData.byType?.map(r => [r.ticket_type, r.ticket_category || '—', r.fast_pass ? 'Yes' : 'No', `$${Number(r.price).toFixed(2)}`, r.tickets_sold, `$${Number(r.subtotal_revenue).toLocaleString()}`, `${r.revenue_share_pct}%`, r.distinct_customers, r.total_transactions, `$${Number(r.avg_transaction).toFixed(2)}`])}
-                totals={reportData.totals ? ['TOTAL', '', '', '', reportData.totals.total_tickets, `$${Number(reportData.totals.total_revenue || 0).toLocaleString()}`, '100%', reportData.totals.distinct_customers, reportData.totals.total_transactions, `$${Number(reportData.totals.avg_price || 0).toFixed(2)}`] : null} />
-              <ReportTable title="Transaction Details" columns={['ID', 'Customer', 'Email', 'Type', 'Category', 'Adults', 'Children', 'Total', 'Visit Date', 'Purchased']}
-                rows={reportData.details?.map(r => [`#${r.purchase_id}`, r.customer_name, r.customer_email || '—', r.ticket_type, r.ticket_category || '—', r.adult_qty, r.child_qty, `$${Number(r.total_price).toFixed(2)}`, r.visit_date || '—', new Date(r.purchase_date).toLocaleDateString()])} />
+                totals={reportData.totals ? ['TOTAL', '', '', '', reportData.totals.total_tickets, `$${Number(reportData.totals.total_revenue || 0).toLocaleString()}`, `${reportData.totals.revenue_share_pct}%`, reportData.totals.distinct_customers, reportData.totals.total_transactions, `$${Number(reportData.totals.avg_price || 0).toFixed(2)}`] : null} />
+              <ReportTable title="Transaction Details" columns={['ID', 'Customer', 'Email', 'Phone', 'Type', 'Category', 'Fast Pass', 'Adults', 'Children', 'Adult Price', 'Child Price', 'Total', 'Visit Date', 'Purchased']}
+                rows={reportData.details?.map(r => [`#${r.purchase_id}`, r.customer_name, r.customer_email || '—', r.customer_phone || '—', r.ticket_type, r.ticket_category || '—', r.fast_pass ? 'Yes' : 'No', r.adult_qty, r.child_qty, `$${Number(r.unit_price_adult).toFixed(2)}`, `$${Number(r.unit_price_child).toFixed(2)}`, `$${Number(r.total_price).toFixed(2)}`, r.visit_date || '—', new Date(r.purchase_date).toLocaleDateString()])} />
             </>
           )}
 
           {/* ─── Employee Activity Report Results ─── */}
           {selectedReport === 'employeeActivity' && (
             <>
-              <ReportTable title="Employee Summary" columns={['Employee', 'Role', 'Total Tasks', 'Completed', 'In Progress', 'Pending', 'Completion %', 'Avg Hours', 'Rides Serviced']}
-                rows={reportData.summary?.map(r => [r.employee_name, r.employee_role, r.total_tasks, r.completed_tasks, r.in_progress_tasks, r.pending_tasks, `${r.completion_rate}%`, r.avg_hours_to_complete ?? '—', r.rides_serviced])}
-                totals={reportData.totals ? ['TOTAL', '', reportData.totals.total_tasks, reportData.totals.completed, reportData.totals.in_progress, reportData.totals.pending, `${reportData.totals.completion_rate}%`, reportData.totals.avg_hours ?? '—', reportData.totals.rides_serviced] : null} />
-              <ReportTable title="Task Details" columns={['Employee', 'Role', 'Ride', 'Zone', 'Task', 'Priority', 'Status', 'Assigned', 'Hours']}
-                rows={reportData.details?.map(r => [r.employee_name, r.employee_role, r.ride_name, r.ride_zone, r.task_description, r.priority, r.status, new Date(r.assigned_date).toLocaleDateString(), r.hours_to_complete ?? '—'])} />
+              <ReportTable title="Employee Summary" columns={['Employee', 'Role', 'Rate', 'Tasks', 'Done', 'Active', 'Pending', 'Done %', 'Avg Hrs', 'Total Hrs', 'Labor Cost', 'Workload', 'Rides']}
+                rows={reportData.summary?.map(r => [r.employee_name, r.employee_role, r.hourly_rate ? `$${Number(r.hourly_rate).toFixed(2)}` : '—', r.total_tasks, r.completed_tasks, r.in_progress_tasks, r.pending_tasks, `${r.completion_rate}%`, r.avg_hours_to_complete ?? '—', `${r.total_hours_worked ?? '—'}h`, r.total_labor_cost ? `$${Number(r.total_labor_cost).toFixed(2)}` : '—', r.workload_ratio ? `${r.workload_ratio}x` : '—', r.rides_serviced])}
+                totals={reportData.totals ? ['TOTAL', `${reportData.totals.total_employees} emp`, '', reportData.totals.total_tasks, reportData.totals.completed, reportData.totals.in_progress, reportData.totals.pending, `${reportData.totals.completion_rate}%`, reportData.totals.avg_hours ?? '—', `${reportData.totals.total_hours_worked ?? '—'}h`, reportData.totals.total_labor_cost ? `$${Number(reportData.totals.total_labor_cost).toFixed(2)}` : '—', '', reportData.totals.rides_serviced] : null} />
+              <ReportTable title="Task Details" columns={['Employee', 'Role', 'Rate', 'Ride', 'Zone', 'Task', 'Priority', 'Status', 'Assigned', 'Completed', 'Hours', 'Elapsed', 'Labor Cost']}
+                rows={reportData.details?.map(r => [r.employee_name, r.employee_role, r.hourly_rate ? `$${Number(r.hourly_rate).toFixed(2)}` : '—', r.ride_name, r.ride_zone, r.task_description, r.priority, r.status, new Date(r.assigned_date).toLocaleDateString(), r.completed_at ? new Date(r.completed_at).toLocaleDateString() : '—', r.hours_to_complete ?? '—', r.elapsed_hours ? `${r.elapsed_hours}h` : '—', r.labor_cost ? `$${Number(r.labor_cost).toFixed(2)}` : '—'])} />
             </>
           )}
 

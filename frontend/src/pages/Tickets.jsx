@@ -1,29 +1,33 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
-import { API_BASE_URL } from "../utils/api"
+import { API_BASE_URL, authFetch } from "../utils/api"
 
 export default function Tickets() {
   const { user } = useAuth()
   const [data, setData] = useState({ details: [], summary: [], totals: null })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [filters, setFilters] = useState({ ticket_type: "", start_date: "", end_date: "" })
 
   async function fetchPurchases() {
     setLoading(true)
+    setError("")
     try {
-      const token = localStorage.getItem("accessToken")
       const params = new URLSearchParams()
       if (filters.ticket_type) params.set("ticket_type", filters.ticket_type)
       if (filters.start_date) params.set("start_date", filters.start_date)
       if (filters.end_date) params.set("end_date", filters.end_date)
 
-      const res = await fetch(`${API_BASE_URL}/api/tickets/all-purchases?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await authFetch(`${API_BASE_URL}/api/tickets/all-purchases?${params}`)
       const json = await res.json()
-      if (res.ok) setData(json)
+      if (res.ok) {
+        setData(json)
+      } else {
+        setError(json.message || "Failed to load ticket data")
+      }
     } catch (err) {
       console.error("Error:", err)
+      setError("Could not connect to server")
     } finally {
       setLoading(false)
     }
@@ -32,15 +36,12 @@ export default function Tickets() {
   useEffect(() => { fetchPurchases() }, [])
 
   async function handleExportCSV() {
-    const token = localStorage.getItem("accessToken")
     const params = new URLSearchParams({ format: "csv" })
     if (filters.ticket_type) params.set("ticket_type", filters.ticket_type)
     if (filters.start_date) params.set("start_date", filters.start_date)
     if (filters.end_date) params.set("end_date", filters.end_date)
 
-    const res = await fetch(`${API_BASE_URL}/api/tickets/all-purchases?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const res = await authFetch(`${API_BASE_URL}/api/tickets/all-purchases?${params}`)
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -149,8 +150,11 @@ export default function Tickets() {
           {loading && (
             <tr><td colSpan="8" className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>
           )}
-          {!loading && data.details.length === 0 && (
-            <tr><td colSpan="8" className="px-4 py-6 text-center text-gray-400">No transactions found. Seed demo data by calling POST /api/tickets/seed-demo.</td></tr>
+          {!loading && error && (
+            <tr><td colSpan="8" className="px-4 py-6 text-center text-red-500">{error}</td></tr>
+          )}
+          {!loading && !error && data.details.length === 0 && (
+            <tr><td colSpan="8" className="px-4 py-6 text-center text-gray-400">No transactions found. Try adjusting your filters or check back later.</td></tr>
           )}
           {data.details.map(d => (
             <tr key={d.purchase_id} className="hover:bg-gray-50">

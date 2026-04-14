@@ -41,7 +41,7 @@ const registerCustomerWithUser = async ({ email, passwordHash, fullName, dateOfB
 };
 
 // Atomically creates a users row + employees row in one transaction
-const registerEmployeeWithUser = async ({ email, passwordHash, fullName, role }) => {
+const registerEmployeeWithUser = async ({ email, passwordHash, fullName, role, hourlyRate }) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -52,8 +52,8 @@ const registerEmployeeWithUser = async ({ email, passwordHash, fullName, role })
     );
 
     const { rows: [employee] } = await client.query(
-      "INSERT INTO employees (email, full_name, role, user_id) VALUES ($1, $2, $3, $4) RETURNING employee_id, full_name, email, role",
-      [email, fullName, role, user.id]
+      "INSERT INTO employees (email, full_name, role, user_id, hourly_rate) VALUES ($1, $2, $3, $4, $5) RETURNING employee_id, full_name, email, role, hourly_rate",
+      [email, fullName, role, user.id, hourlyRate || null]
     );
 
     await client.query("COMMIT");

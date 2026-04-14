@@ -94,11 +94,12 @@ function HeroSection() {
     }}>
       {HERO_SLIDES.map((s, i) => (
         <div key={i} style={{
-          position: "absolute", inset: 0,
+          position: "absolute", inset: 0, zIndex: 0,
           backgroundImage: `url(${s.img})`,
           backgroundSize: "cover", backgroundPosition: "center",
           opacity: i === current ? 1 : 0,
           transition: "opacity 0.8s ease-in-out",
+          pointerEvents: "none",
         }}>
           <div style={{
             position: "absolute", inset: 0,
@@ -139,7 +140,11 @@ function HeroSection() {
         {slide.href.startsWith("/") ? (
           <Link to={slide.href} style={heroCTAStyle}>{slide.cta} <span style={{ fontSize: "1.1rem" }}>→</span></Link>
         ) : (
-          <a href={slide.href} style={heroCTAStyle}>{slide.cta} <span style={{ fontSize: "1.1rem" }}>→</span></a>
+          <a href={slide.href} onClick={(e) => {
+            e.preventDefault()
+            const id = slide.href.replace("#", "")
+            document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })
+          }} style={heroCTAStyle}>{slide.cta} <span style={{ fontSize: "1.1rem" }}>→</span></a>
         )}
       </div>
 

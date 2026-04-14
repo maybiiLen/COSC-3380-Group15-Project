@@ -108,6 +108,15 @@ router.post("/purchase", optionalAuth, async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK")
     console.log("Purchase error:", err.message)
+    // Detect trigger rejection (SQLSTATE TP001 or message pattern)
+    if (err.message && err.message.includes('Ticket purchase rejected:')) {
+      return res.status(422).json({
+        message: err.message,
+        trigger_rejection: true,
+        detail: err.detail || null,
+        hint: err.hint || null,
+      })
+    }
     res.status(500).json({ message: err.message })
   } finally {
     client.release()
@@ -189,6 +198,59 @@ router.get("/all-purchases", verifyToken, verifyRole("manager", "admin"), async 
     res.json({ details, summary, totals: totals[0] })
   } catch (err) {
     console.log("Report error:", err.message)
+    res.status(500).json({ message: err.message })
+  }
+})
+
+// ─── Ticket Policy Enforcement Demo Endpoints ───
+
+// GET sales rejections log
+router.get("/policy/rejections", verifyToken, verifyRole("manager", "admin"), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT sr.*, c.full_name AS customer_name
+        FROM sales_rejections sr
+        LEFT JOIN customers c ON c.customer_id = sr.customer_id
+       ORDER BY sr.rejected_at DESC
+       LIMIT 50
+    `)
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+})
+
+// GET policy config
+router.get("/policy/config", verifyToken, verifyRole("manager", "admin"), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM policy_config ORDER BY key`)
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+})
+
+// PUT update policy config
+router.put("/policy/config/:key", verifyToken, verifyRole("manager", "admin"), async (req, res) => {
+  try {
+    const { value } = req.body
+    const { rows } = await pool.query(
+      `UPDATE policy_config SET value = $1 WHERE key = $2 RETURNING *`,
+      [value, req.params.key]
+    )
+    if (rows.length === 0) return res.status(404).json({ message: "Config key not found" })
+    res.json(rows[0])
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+})
+
+// POST clear rejections log
+router.post("/policy/clear-rejections", verifyToken, verifyRole("manager", "admin"), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM sales_rejections`)
+    res.json({ message: "Rejections log cleared" })
+  } catch (err) {
     res.status(500).json({ message: err.message })
   }
 })

@@ -11,7 +11,8 @@ export default function AuthPage() {
   const [step, setStep] = useState("email")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [fullName, setFullName] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [dateOfBirth, setDateOfBirth] = useState("")
   const [phone, setPhone] = useState("")
   const [error, setError] = useState("")
@@ -63,7 +64,7 @@ export default function AuthPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, full_name: fullName, date_of_birth: dateOfBirth, phone }),
+        body: JSON.stringify({ email, password, full_name: `${firstName.trim()} ${lastName.trim()}`, date_of_birth: dateOfBirth, phone }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.message || "Registration failed"); return }
@@ -79,7 +80,7 @@ export default function AuthPage() {
   }
 
   function handleEditEmail() {
-    setStep("email"); setPassword(""); setFullName(""); setDateOfBirth(""); setPhone(""); setError("")
+    setStep("email"); setPassword(""); setFirstName(""); setLastName(""); setDateOfBirth(""); setPhone(""); setError("")
   }
 
   return (
@@ -178,7 +179,7 @@ export default function AuthPage() {
               </div>
 
               <button onClick={() => setStep("login")} style={secondaryBtnStyle}>
-                Looking for username login?
+                Already have an account? Log in
               </button>
             </div>
           )}
@@ -237,13 +238,23 @@ export default function AuthPage() {
               </p>
 
               <form onSubmit={handleRegister}>
-                <div style={{ marginBottom: "1.25rem" }}>
-                  <label style={labelStyle}>Full Name</label>
-                  <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-                    placeholder="John Doe" required autoFocus style={inputStyle}
-                    onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
-                    onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
-                  />
+                <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>First Name</label>
+                    <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
+                      placeholder="John" required autoFocus style={inputStyle}
+                      onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                      onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Last Name</label>
+                    <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
+                      placeholder="Doe" required style={inputStyle}
+                      onFocus={e => e.currentTarget.style.borderColor = "var(--cr-red)"}
+                      onBlur={e => e.currentTarget.style.borderColor = "#3A3939"}
+                    />
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
@@ -285,7 +296,10 @@ export default function AuthPage() {
                 </button>
               </form>
 
-              <button onClick={handleEditEmail} style={backLinkStyle}>← Back</button>
+              <p style={{ fontFamily: f, fontSize: "0.82rem", color: "rgba(255,255,255,0.35)", textAlign: "center", marginTop: "1.5rem" }}>
+                Already have an account?{" "}
+                <button onClick={() => setStep("login")} style={{ ...editLinkStyle, color: "var(--cr-coral, #F4845F)" }}>Log in</button>
+              </p>
             </div>
           )}
 

@@ -8,7 +8,7 @@ const pool = require("../config/db")
 // Filters: ride, priority, status, date range
 // ═══════════════════════════════════════════════════════════════════
 router.get("/maintenance", async (req, res) => {
-  const { ride_id, priority, status, start_date, end_date, format } = req.query
+  const { ride_id, employee_id, priority, status, start_date, end_date, format } = req.query
 
   let conditions = []
   let params = []
@@ -17,6 +17,10 @@ router.get("/maintenance", async (req, res) => {
   if (ride_id && ride_id !== '') {
     conditions.push(`m.ride_id = $${idx++}`);
     params.push(parseInt(ride_id))
+  }
+  if (employee_id && employee_id !== '') {
+    conditions.push(`m.employee_id = $${idx++}`);
+    params.push(parseInt(employee_id))
   }
   if (priority && priority !== '') {
     conditions.push(`m.priority = $${idx++}`);
@@ -38,7 +42,7 @@ router.get("/maintenance", async (req, res) => {
   const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : ""
 
   try {
-    // Get detail rows
+    // Get detail rows — 5-table JOIN: maintenance_requests + rides + employees + park_closures + notifications
     const { rows: details } = await pool.query(`
       SELECT
         m.request_id,
@@ -53,15 +57,34 @@ router.get("/maintenance", async (req, res) => {
           WHEN m.completed_at IS NOT NULL
           THEN ROUND(EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600, 1)
           ELSE NULL
-        END AS hours_to_complete
+        END AS hours_to_complete,
+        pc.closure_type,
+        pc.reason AS closure_reason,
+        CASE WHEN pc.closure_id IS NOT NULL THEN true ELSE false END AS zone_was_closed,
+        (SELECT COUNT(*) FROM notifications n
+         WHERE n.related_table = 'maintenance_requests'
+         AND n.related_id = m.request_id) AS alerts_sent,
+        (SELECT COUNT(*) FROM notifications n
+         WHERE n.related_table = 'maintenance_requests'
+         AND n.related_id = m.request_id
+         AND n.type = 'maintenance_critical') AS manager_alerts
       FROM maintenance_requests m
       JOIN rides r ON r.ride_id = m.ride_id
       LEFT JOIN employees e ON e.employee_id = m.employee_id
+      LEFT JOIN LATERAL (
+        SELECT pc2.closure_id, pc2.closure_type, pc2.reason
+        FROM park_closures pc2
+        WHERE pc2.zone = r.location
+          AND pc2.started_at <= COALESCE(m.completed_at, NOW())
+          AND COALESCE(pc2.ended_at, NOW()) >= m.created_at
+        ORDER BY pc2.started_at DESC
+        LIMIT 1
+      ) pc ON true
       ${where}
       ORDER BY m.created_at DESC
     `, params)
 
-    // Get summary per ride
+    // Get summary per ride — 5-table JOIN
     const { rows: summary } = await pool.query(`
       SELECT
         r.ride_name,
@@ -78,15 +101,28 @@ router.get("/maintenance", async (req, res) => {
         ROUND(SUM(CASE WHEN m.completed_at IS NOT NULL THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 ELSE NULL END)::numeric, 1) AS total_downtime_hours,
         ROUND(MIN(CASE WHEN m.completed_at IS NOT NULL THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 ELSE NULL END)::numeric, 1) AS min_hours,
         ROUND(MAX(CASE WHEN m.completed_at IS NOT NULL THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 ELSE NULL END)::numeric, 1) AS max_hours,
-        COUNT(DISTINCT m.employee_id) AS distinct_employees
+        COUNT(DISTINCT m.employee_id) AS distinct_employees,
+        COUNT(m.request_id) FILTER (WHERE pc.closure_id IS NOT NULL) AS closure_related,
+        SUM((SELECT COUNT(*) FROM notifications n2
+             WHERE n2.related_table = 'maintenance_requests'
+             AND n2.related_id = m.request_id)) AS total_alerts
       FROM maintenance_requests m
       JOIN rides r ON r.ride_id = m.ride_id
+      LEFT JOIN LATERAL (
+        SELECT pc2.closure_id
+        FROM park_closures pc2
+        WHERE pc2.zone = r.location
+          AND pc2.started_at <= COALESCE(m.completed_at, NOW())
+          AND COALESCE(pc2.ended_at, NOW()) >= m.created_at
+        ORDER BY pc2.started_at DESC
+        LIMIT 1
+      ) pc ON true
       ${where}
       GROUP BY r.ride_name
       ORDER BY total_requests DESC
     `, params)
 
-    // Get grand totals
+    // Get grand totals — 5-table JOIN
     const { rows: totals } = await pool.query(`
       SELECT
         COUNT(m.request_id) AS total_requests,
@@ -102,16 +138,29 @@ router.get("/maintenance", async (req, res) => {
         ROUND(SUM(CASE WHEN m.completed_at IS NOT NULL THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 ELSE NULL END)::numeric, 1) AS total_downtime_hours,
         ROUND(MIN(CASE WHEN m.completed_at IS NOT NULL THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 ELSE NULL END)::numeric, 1) AS min_hours,
         ROUND(MAX(CASE WHEN m.completed_at IS NOT NULL THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 ELSE NULL END)::numeric, 1) AS max_hours,
-        COUNT(DISTINCT m.employee_id) AS distinct_employees
+        COUNT(DISTINCT m.employee_id) AS distinct_employees,
+        COUNT(m.request_id) FILTER (WHERE pc.closure_id IS NOT NULL) AS closure_related,
+        SUM((SELECT COUNT(*) FROM notifications n2
+             WHERE n2.related_table = 'maintenance_requests'
+             AND n2.related_id = m.request_id)) AS total_alerts
       FROM maintenance_requests m
       JOIN rides r ON r.ride_id = m.ride_id
+      LEFT JOIN LATERAL (
+        SELECT pc2.closure_id
+        FROM park_closures pc2
+        WHERE pc2.zone = r.location
+          AND pc2.started_at <= COALESCE(m.completed_at, NOW())
+          AND COALESCE(pc2.ended_at, NOW()) >= m.created_at
+        ORDER BY pc2.started_at DESC
+        LIMIT 1
+      ) pc ON true
       ${where}
     `, params)
 
     if (format === 'csv') {
-      const csvHeaders = 'Request ID,Ride Name,Description,Priority,Status,Request Date,Employee\n'
+      const csvHeaders = 'Request ID,Ride Name,Description,Priority,Status,Assigned To,Request Date,Completed At,Hours to Complete,Zone Closed,Closure Type,Alerts Sent\n'
       const csvRows = details.map(row =>
-        `${row.request_id},"${row.ride_name}","${row.description}",${row.priority},${row.status},${new Date(row.request_date).toLocaleDateString()},"${row.assigned_to}"`
+        `${row.request_id},"${row.ride_name}","${row.description}",${row.priority},${row.status},"${row.assigned_to}",${new Date(row.request_date).toLocaleDateString()},${row.completed_at ? new Date(row.completed_at).toLocaleDateString() : ''},${row.hours_to_complete || ''},${row.zone_was_closed ? 'Yes' : 'No'},"${row.closure_type || ''}",${row.alerts_sent}`
       ).join('\n')
       res.setHeader('Content-Type', 'text/csv')
       res.send(csvHeaders + csvRows)
@@ -120,7 +169,7 @@ router.get("/maintenance", async (req, res) => {
 
     res.json({
       details, summary, totals: totals[0],
-      tables_used: ["maintenance_requests", "rides", "employees"]
+      tables_used: ["maintenance_requests", "rides", "employees", "park_closures", "notifications"]
     })
   } catch (err) {
     console.log("Report error:", err.message)
@@ -196,6 +245,7 @@ router.get("/ticket-sales", async (req, res) => {
       SELECT
         SUM(tp.adult_qty + tp.child_qty) AS total_tickets,
         SUM(tp.total_price) AS total_revenue,
+        ROUND(100.0 * SUM(tp.total_price) / NULLIF((SELECT SUM(total_price) FROM ticket_purchases), 0), 1) AS revenue_share_pct,
         ROUND(AVG(tp.total_price)::numeric, 2) AS avg_price,
         COUNT(DISTINCT c.customer_id) AS distinct_customers,
         COUNT(tp.purchase_id) AS total_transactions
@@ -205,9 +255,9 @@ router.get("/ticket-sales", async (req, res) => {
     `, params)
 
     if (format === 'csv') {
-      const csvHeaders = 'Purchase ID,Customer,Type,Category,Fast Pass,Adults,Children,Total,Date\n'
+      const csvHeaders = 'Purchase ID,Customer,Email,Phone,Type,Category,Fast Pass,Adults,Children,Adult Price,Child Price,Total,Visit Date,Purchased\n'
       const csvRows = details.map(row =>
-        `${row.purchase_id},"${row.customer_name}","${row.ticket_type}","${row.ticket_category || ''}",${row.fast_pass || false},${row.adult_qty},${row.child_qty},${row.total_price},${new Date(row.purchase_date).toLocaleDateString()}`
+        `${row.purchase_id},"${row.customer_name}","${row.customer_email || ''}","${row.customer_phone || ''}","${row.ticket_type}","${row.ticket_category || ''}",${row.fast_pass || false},${row.adult_qty},${row.child_qty},${row.unit_price_adult},${row.unit_price_child},${row.total_price},${row.visit_date || ''},${new Date(row.purchase_date).toLocaleDateString()}`
       ).join('\n')
       res.setHeader('Content-Type', 'text/csv')
       res.send(csvHeaders + csvRows)
@@ -243,6 +293,7 @@ router.get("/employee-activity", async (req, res) => {
 
   try {
     // Detail rows — 3-table JOIN: employees + maintenance_requests + rides
+    // NEW: labor_cost (hours × hourly_rate), elapsed_hours for in-progress tasks
     const { rows: details } = await pool.query(`
       SELECT
         e.employee_id,
@@ -263,7 +314,17 @@ router.get("/employee-activity", async (req, res) => {
           WHEN m.completed_at IS NOT NULL
           THEN ROUND(EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600, 1)
           ELSE NULL
-        END AS hours_to_complete
+        END AS hours_to_complete,
+        CASE
+          WHEN m.status = 'In Progress'
+          THEN ROUND(EXTRACT(EPOCH FROM (NOW() - m.created_at)) / 3600, 1)
+          ELSE NULL
+        END AS elapsed_hours,
+        CASE
+          WHEN m.completed_at IS NOT NULL AND e.hourly_rate IS NOT NULL
+          THEN ROUND((EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 * e.hourly_rate)::numeric, 2)
+          ELSE NULL
+        END AS labor_cost
       FROM employees e
       JOIN maintenance_requests m ON m.employee_id = e.employee_id
       JOIN rides r ON r.ride_id = m.ride_id
@@ -272,11 +333,13 @@ router.get("/employee-activity", async (req, res) => {
     `, params)
 
     // Summary per employee
+    // NEW: hourly_rate, total_labor_cost, total_hours, workload_vs_avg
     const { rows: summary } = await pool.query(`
       SELECT
         e.employee_id,
         e.full_name AS employee_name,
         e.role AS employee_role,
+        e.hourly_rate,
         COUNT(m.request_id) AS total_tasks,
         COUNT(m.request_id) FILTER (WHERE m.status = 'Completed') AS completed_tasks,
         COUNT(m.request_id) FILTER (WHERE m.status = 'In Progress') AS in_progress_tasks,
@@ -287,12 +350,26 @@ router.get("/employee-activity", async (req, res) => {
           THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600
           ELSE NULL END
         )::numeric, 1) AS avg_hours_to_complete,
-        COUNT(DISTINCT r.ride_id) AS rides_serviced
+        ROUND(SUM(
+          CASE WHEN m.completed_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600
+          ELSE NULL END
+        )::numeric, 1) AS total_hours_worked,
+        ROUND(SUM(
+          CASE WHEN m.completed_at IS NOT NULL AND e.hourly_rate IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 * e.hourly_rate
+          ELSE NULL END
+        )::numeric, 2) AS total_labor_cost,
+        COUNT(DISTINCT r.ride_id) AS rides_serviced,
+        ROUND(COUNT(m.request_id)::numeric / NULLIF(
+          (SELECT AVG(task_count) FROM (
+            SELECT COUNT(*) AS task_count FROM maintenance_requests WHERE employee_id IS NOT NULL GROUP BY employee_id
+          ) sub), 0), 2) AS workload_ratio
       FROM employees e
       JOIN maintenance_requests m ON m.employee_id = e.employee_id
       JOIN rides r ON r.ride_id = m.ride_id
       ${where}
-      GROUP BY e.employee_id, e.full_name, e.role
+      GROUP BY e.employee_id, e.full_name, e.role, e.hourly_rate
       ORDER BY total_tasks DESC
     `, params)
 
@@ -310,6 +387,16 @@ router.get("/employee-activity", async (req, res) => {
           THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600
           ELSE NULL END
         )::numeric, 1) AS avg_hours,
+        ROUND(SUM(
+          CASE WHEN m.completed_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600
+          ELSE NULL END
+        )::numeric, 1) AS total_hours_worked,
+        ROUND(SUM(
+          CASE WHEN m.completed_at IS NOT NULL AND e.hourly_rate IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 * e.hourly_rate
+          ELSE NULL END
+        )::numeric, 2) AS total_labor_cost,
         COUNT(DISTINCT r.ride_id) AS rides_serviced
       FROM employees e
       JOIN maintenance_requests m ON m.employee_id = e.employee_id
@@ -318,9 +405,9 @@ router.get("/employee-activity", async (req, res) => {
     `, params)
 
     if (format === 'csv') {
-      const csvHeaders = 'Employee,Role,Ride,Task,Priority,Status,Assigned,Completed,Hours\n'
+      const csvHeaders = 'Employee,Role,Hourly Rate,Ride,Zone,Task,Priority,Status,Assigned Date,Completed At,Hours to Complete,Elapsed Hours,Labor Cost\n'
       const csvRows = details.map(row =>
-        `"${row.employee_name}","${row.employee_role}","${row.ride_name}","${row.task_description}","${row.priority}","${row.status}",${new Date(row.assigned_date).toLocaleDateString()},${row.completed_at ? new Date(row.completed_at).toLocaleDateString() : ''},${row.hours_to_complete || ''}`
+        `"${row.employee_name}","${row.employee_role}",${row.hourly_rate || ''},"${row.ride_name}","${row.ride_zone}","${row.task_description}","${row.priority}","${row.status}",${new Date(row.assigned_date).toLocaleDateString()},${row.completed_at ? new Date(row.completed_at).toLocaleDateString() : ''},${row.hours_to_complete || ''},${row.elapsed_hours || ''},${row.labor_cost || ''}`
       ).join('\n')
       res.setHeader('Content-Type', 'text/csv')
       res.send(csvHeaders + csvRows)

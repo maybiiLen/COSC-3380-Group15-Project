@@ -20,8 +20,8 @@ const register = async (req, res) => {
 
 const registerEmployee = async (req, res) => {
   try {
-    const { email, password, full_name, role } = req.body;
-    const { user, employee } = await authService.registerEmployee(email, password, full_name, role);
+    const { email, password, full_name, role, hourly_rate } = req.body;
+    const { user, employee } = await authService.registerEmployee(email, password, full_name, role, hourly_rate);
     res.status(201).json({ user, employee });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message || "Internal server error" });

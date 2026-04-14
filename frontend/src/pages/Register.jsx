@@ -8,7 +8,8 @@ export default function Register() {
   const [form, setForm] = useState({
     email: "",
     password: "",
-    full_name: "",
+    first_name: "",
+    last_name: "",
     date_of_birth: "",
     phone: "",
     role: "customer",
@@ -32,12 +33,13 @@ export default function Register() {
     try {
       let endpoint, requestBody;
 
+      const fullName = `${form.first_name.trim()} ${form.last_name.trim()}`;
       if (form.role === "customer") {
         endpoint = `${API_BASE_URL}/api/auth/register`;
         requestBody = {
           email: form.email,
           password: form.password,
-          full_name: form.full_name,
+          full_name: fullName,
           date_of_birth: form.date_of_birth,
           phone: form.phone,
         };
@@ -46,7 +48,7 @@ export default function Register() {
         requestBody = {
           email: form.email,
           password: form.password,
-          full_name: form.full_name,
+          full_name: fullName,
           role: form.role,
         };
       }
@@ -117,16 +119,16 @@ export default function Register() {
           </select>
         </div>
 
-        {/* Name + Phone row (Phone only for customers) */}
+        {/* First Name + Last Name row */}
         <div className="flex gap-3">
-          <div className={`flex ${form.role === "customer" ? "flex-1" : "w-full"} flex-col gap-1`}>
-            <label className="text-sm font-medium text-gray-700">Full Name</label>
+          <div className="flex flex-1 flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">First Name</label>
             <input
               type="text"
-              name="full_name"
-              value={form.full_name}
+              name="first_name"
+              value={form.first_name}
               onChange={handleChange}
-              placeholder="John Smith"
+              placeholder="John"
               required
               className={inputClass}
             />
@@ -134,25 +136,38 @@ export default function Register() {
               <p className="text-xs text-red-500">{fieldErrors.full_name[0]}</p>
             )}
           </div>
-
-          {form.role === "customer" && (
-            <div className="flex flex-1 flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Phone</label>
-              <input
-                type="tel"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                placeholder="7135551234"
-                required
-                className={inputClass}
-              />
-              {fieldErrors.phone && (
-                <p className="text-xs text-red-500">{fieldErrors.phone[0]}</p>
-              )}
-            </div>
-          )}
+          <div className="flex flex-1 flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Last Name</label>
+            <input
+              type="text"
+              name="last_name"
+              value={form.last_name}
+              onChange={handleChange}
+              placeholder="Smith"
+              required
+              className={inputClass}
+            />
+          </div>
         </div>
+
+        {/* Phone (only for customers) */}
+        {form.role === "customer" && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Phone</label>
+            <input
+              type="tel"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              placeholder="7135551234"
+              required
+              className={inputClass}
+            />
+            {fieldErrors.phone && (
+              <p className="text-xs text-red-500">{fieldErrors.phone[0]}</p>
+            )}
+          </div>
+        )}
 
         {/* Email */}
         <div className="flex flex-col gap-1">

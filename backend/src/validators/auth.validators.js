@@ -23,6 +23,7 @@ const registerEmployeeSchema = z.object({
     .max(100, "Password must be under 100 characters"),
   full_name: z.string().min(1, "Full name is required"),
   role: z.enum(["admin", "manager", "staff"]),
+  hourly_rate: z.number().positive().optional().nullable(),
 });
 
 const loginSchema = z.object({

@@ -41,7 +41,7 @@ const registerUser = async (email, password, fullName, dateOfBirth, phone) => {
   return repo.registerCustomerWithUser({ email, passwordHash, fullName, dateOfBirth, phone });
 };
 
-const registerEmployee = async (email, password, fullName, role) => {
+const registerEmployee = async (email, password, fullName, role, hourlyRate) => {
   const existing = await repo.findUserByEmail(email);
   if (existing) {
     const err = new Error("Email already in use");
@@ -50,7 +50,7 @@ const registerEmployee = async (email, password, fullName, role) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  return repo.registerEmployeeWithUser({ email, passwordHash, fullName, role });
+  return repo.registerEmployeeWithUser({ email, passwordHash, fullName, role, hourlyRate });
 };
 
 const loginUser = async (email, password) => {

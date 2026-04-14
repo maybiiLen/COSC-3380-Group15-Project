@@ -15,10 +15,12 @@ export default function Staff() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [form, setForm] = useState({
-    full_name: "",
+    first_name: "",
+    last_name: "",
     email: "",
     password: "",
     role: "staff",
+    hourly_rate: "",
   })
   const [editItem, setEditItem] = useState(null)
   const [editForm, setEditForm] = useState({ role: "staff", hourly_rate: "", shift_start: "", shift_end: "", ride_id: "" })
@@ -59,19 +61,26 @@ export default function Staff() {
 
     try {
       const token = localStorage.getItem("accessToken")
+      const fullName = `${form.first_name.trim()} ${form.last_name.trim()}`
       const res = await fetch(`${API_BASE_URL}/api/auth/register/employee`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          full_name: fullName,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
+        }),
       })
 
       const data = await res.json()
       if (res.ok) {
-        setSuccess(`Employee ${form.full_name} has been added successfully!`)
-        setForm({ full_name: "", email: "", password: "", role: "staff" })
+        setSuccess(`Employee ${fullName} has been added successfully!`)
+        setForm({ first_name: "", last_name: "", email: "", password: "", role: "staff", hourly_rate: "" })
         setShowCreate(false)
         fetchEmployees()
       } else {
@@ -355,37 +364,71 @@ export default function Staff() {
               </div>
 
               <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <div>
-                  <label style={{
-                    display: "block",
-                    fontFamily: f,
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    color: "rgba(255,255,255,0.7)",
-                    marginBottom: "0.5rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px"
-                  }}>Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.full_name}
-                    onChange={e => setForm({ ...form, full_name: e.target.value })}
-                    placeholder="Jane Smith"
-                    style={{
-                      width: "100%",
-                      padding: "0.75rem",
-                      background: "#222",
-                      border: "1px solid #3A3939",
-                      borderRadius: "8px",
-                      color: "white",
+                <div style={{ display: "flex", gap: "0.75rem" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{
+                      display: "block",
                       fontFamily: f,
-                      fontSize: "0.85rem",
-                      outline: "none"
-                    }}
-                    onFocus={e => e.target.style.borderColor = "#C8102E"}
-                    onBlur={e => e.target.style.borderColor = "#3A3939"}
-                  />
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.7)",
+                      marginBottom: "0.5rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px"
+                    }}>First Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={form.first_name}
+                      onChange={e => setForm({ ...form, first_name: e.target.value })}
+                      placeholder="Jane"
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        background: "#222",
+                        border: "1px solid #3A3939",
+                        borderRadius: "8px",
+                        color: "white",
+                        fontFamily: f,
+                        fontSize: "0.85rem",
+                        outline: "none"
+                      }}
+                      onFocus={e => e.target.style.borderColor = "#C8102E"}
+                      onBlur={e => e.target.style.borderColor = "#3A3939"}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{
+                      display: "block",
+                      fontFamily: f,
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.7)",
+                      marginBottom: "0.5rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px"
+                    }}>Last Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={form.last_name}
+                      onChange={e => setForm({ ...form, last_name: e.target.value })}
+                      placeholder="Smith"
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        background: "#222",
+                        border: "1px solid #3A3939",
+                        borderRadius: "8px",
+                        color: "white",
+                        fontFamily: f,
+                        fontSize: "0.85rem",
+                        outline: "none"
+                      }}
+                      onFocus={e => e.target.style.borderColor = "#C8102E"}
+                      onBlur={e => e.target.style.borderColor = "#3A3939"}
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -504,6 +547,40 @@ export default function Staff() {
                     {form.role === "manager" && "Can manage rides, view reports, oversee staff work"}
                     {form.role === "admin" && "Full access including employee management"}
                   </p>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: "block",
+                    fontFamily: f,
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    color: "rgba(255,255,255,0.7)",
+                    marginBottom: "0.5rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px"
+                  }}>Hourly Rate ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.hourly_rate}
+                    onChange={e => setForm({ ...form, hourly_rate: e.target.value })}
+                    placeholder="18.50"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      background: "#222",
+                      border: "1px solid #3A3939",
+                      borderRadius: "8px",
+                      color: "white",
+                      fontFamily: f,
+                      fontSize: "0.85rem",
+                      outline: "none"
+                    }}
+                    onFocus={e => e.target.style.borderColor = "#C8102E"}
+                    onBlur={e => e.target.style.borderColor = "#3A3939"}
+                  />
                 </div>
 
                 {error && (
