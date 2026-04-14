@@ -157,12 +157,13 @@ router.get("/all-purchases", verifyToken, verifyRole("manager", "admin"), async 
   try {
     const { rows: details } = await pool.query(`
       SELECT tp.purchase_id, tp.ticket_type,
-        COALESCE(c.full_name, u.email, 'Guest') AS customer_name,
+        COALESCE(c.full_name, c2.full_name, 'Guest') AS customer_name,
         tp.adult_qty, tp.child_qty, tp.unit_price_adult, tp.unit_price_child,
         tp.total_price, tp.visit_date, tp.purchase_date,
         tp.card_last_four, tp.cardholder_name
       FROM ticket_purchases tp
       LEFT JOIN customers c ON c.customer_id = tp.customer_id
+      LEFT JOIN customers c2 ON c2.user_id = tp.user_id
       LEFT JOIN users u ON u.id = tp.user_id
       ${where} ORDER BY tp.purchase_date DESC
     `, params)
