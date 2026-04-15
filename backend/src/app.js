@@ -1,33 +1,24 @@
-const express = require("express");
-const cors = require("cors");
-const cookieParser = require("cookie-parser");
+const createApp = require("./lib/server");
 const healthRouter = require("./routes/health.routes");
 const authRouter = require("./routes/auth.routes");
-const ridesRouter = require("./routes/rides.routes")
-const maintenanceRouter = require("./routes/maintenance.routes")
-const employeesRouter = require("./routes/employees.routes")
-const reportsRouter = require("./routes/reports.routes")
-const ticketsRouter = require("./routes/tickets.routes")
-const notificationsRouter = require("./routes/notifications.routes")
-const parkOpsRouter = require("./routes/ParkOperations.routes")
+const ridesRouter = require("./routes/rides.routes");
+const maintenanceRouter = require("./routes/maintenance.routes");
+const employeesRouter = require("./routes/employees.routes");
+const reportsRouter = require("./routes/reports.routes");
+const ticketsRouter = require("./routes/tickets.routes");
+const notificationsRouter = require("./routes/notifications.routes");
+const parkOpsRouter = require("./routes/ParkOperations.routes");
 
-const app = express();
-
-app.use(cors({
-  origin: true,
-  credentials: true,
-}));
-app.use(express.json());
-app.use(cookieParser());
+const app = createApp();
 
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
-app.use("/api/rides", ridesRouter)
-app.use("/api/maintenance", maintenanceRouter)
-app.use("/api/employees", employeesRouter)
-app.use("/api/reports", reportsRouter)
-app.use("/api/tickets", ticketsRouter)
-app.use("/api/notifications", notificationsRouter)
-app.use("/api/park-ops", parkOpsRouter)
+app.use("/api/rides", ridesRouter);
+app.use("/api/maintenance", maintenanceRouter);
+app.use("/api/employees", employeesRouter);
+app.use("/api/reports", reportsRouter);
+app.use("/api/tickets", ticketsRouter);
+app.use("/api/notifications", notificationsRouter);
+app.use("/api/park-ops", parkOpsRouter);
 
 module.exports = app;

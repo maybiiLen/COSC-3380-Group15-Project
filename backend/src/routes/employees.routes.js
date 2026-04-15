@@ -1,5 +1,5 @@
-const express = require("express")
-const router = express.Router()
+const { Router } = require("../lib/router")
+const router = Router()
 const pool = require("../config/db")
 
 // GET all employees (for dropdowns and staff page)

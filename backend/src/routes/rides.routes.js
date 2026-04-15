@@ -1,5 +1,5 @@
-const express = require("express")
-const router = express.Router()
+const { Router } = require("../lib/router")
+const router = Router()
 const pool = require("../config/db")
 
 // ─── GET all rides ───
@@ -78,7 +78,7 @@ router.delete("/:id", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE rides
-       SET is_operational = false, status = 'Decommissioned'
+       SET is_operational = false, status = 'Decommissioned', decommissioned_at = NOW()
        WHERE ride_id = $1
        RETURNING *`,
       [id]
@@ -102,7 +102,7 @@ router.patch("/:id/restore", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE rides
-       SET is_operational = true, status = 'Operational'
+       SET is_operational = true, status = 'Operational', decommissioned_at = NULL
        WHERE ride_id = $1
        RETURNING *`,
       [id]

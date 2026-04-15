@@ -1,4 +1,4 @@
-const { Router } = require("express");
+const { Router } = require("../lib/router");
 const { register, registerEmployee, login, refresh, logout } = require("../controllers/auth.controller");
 const validate = require("../middleware/validate");
 const verifyToken = require("../middleware/verifyToken");
