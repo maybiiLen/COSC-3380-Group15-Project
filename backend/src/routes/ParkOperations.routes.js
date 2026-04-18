@@ -5,9 +5,15 @@ const pool = require("../config/db")
 // ═══════════════════════════════════════════
 // RESTAURANTS
 // ═══════════════════════════════════════════
+// ?all=true → show all (for staff/manager views)
+// default  → only show non-decommissioned (for customer view)
 router.get("/restaurants", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM restaurant ORDER BY restaurant_id")
+    const showAll = req.query.all === "true"
+    const query = showAll
+      ? "SELECT * FROM restaurant ORDER BY restaurant_id"
+      : "SELECT * FROM restaurant WHERE decommissioned_at IS NULL ORDER BY restaurant_id"
+    const { rows } = await pool.query(query)
     res.json(rows)
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
@@ -38,10 +44,33 @@ router.put("/restaurants/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
+// Soft delete — mark as decommissioned, preserve historical sales data
 router.delete("/restaurants/:id", async (req, res) => {
   try {
-    await pool.query("DELETE FROM restaurant WHERE restaurant_id = $1", [req.params.id])
-    res.json({ message: "Deleted" })
+    const { rows } = await pool.query(
+      `UPDATE restaurant
+         SET operational_status = 0, decommissioned_at = NOW()
+       WHERE restaurant_id = $1
+       RETURNING *`,
+      [req.params.id]
+    )
+    if (rows.length === 0) return res.status(404).json({ message: "Restaurant not found" })
+    res.json({ message: "Restaurant decommissioned (soft-deleted)", restaurant: rows[0] })
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+// Restore a decommissioned restaurant
+router.patch("/restaurants/:id/restore", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE restaurant
+         SET operational_status = 1, decommissioned_at = NULL
+       WHERE restaurant_id = $1
+       RETURNING *`,
+      [req.params.id]
+    )
+    if (rows.length === 0) return res.status(404).json({ message: "Restaurant not found" })
+    res.json({ message: "Restaurant restored", restaurant: rows[0] })
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
@@ -50,7 +79,11 @@ router.delete("/restaurants/:id", async (req, res) => {
 // ═══════════════════════════════════════════
 router.get("/gift-shops", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM gift_shop ORDER BY gift_shop_id")
+    const showAll = req.query.all === "true"
+    const query = showAll
+      ? "SELECT * FROM gift_shop ORDER BY gift_shop_id"
+      : "SELECT * FROM gift_shop WHERE decommissioned_at IS NULL ORDER BY gift_shop_id"
+    const { rows } = await pool.query(query)
     res.json(rows)
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
@@ -81,10 +114,33 @@ router.put("/gift-shops/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
+// Soft delete — mark as decommissioned, preserve historical sales data
 router.delete("/gift-shops/:id", async (req, res) => {
   try {
-    await pool.query("DELETE FROM gift_shop WHERE gift_shop_id = $1", [req.params.id])
-    res.json({ message: "Deleted" })
+    const { rows } = await pool.query(
+      `UPDATE gift_shop
+         SET operational_status = 0, decommissioned_at = NOW()
+       WHERE gift_shop_id = $1
+       RETURNING *`,
+      [req.params.id]
+    )
+    if (rows.length === 0) return res.status(404).json({ message: "Gift shop not found" })
+    res.json({ message: "Gift shop decommissioned (soft-deleted)", gift_shop: rows[0] })
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+// Restore a decommissioned gift shop
+router.patch("/gift-shops/:id/restore", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE gift_shop
+         SET operational_status = 1, decommissioned_at = NULL
+       WHERE gift_shop_id = $1
+       RETURNING *`,
+      [req.params.id]
+    )
+    if (rows.length === 0) return res.status(404).json({ message: "Gift shop not found" })
+    res.json({ message: "Gift shop restored", gift_shop: rows[0] })
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
@@ -93,7 +149,11 @@ router.delete("/gift-shops/:id", async (req, res) => {
 // ═══════════════════════════════════════════
 router.get("/games", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM game ORDER BY game_id")
+    const showAll = req.query.all === "true"
+    const query = showAll
+      ? "SELECT * FROM game ORDER BY game_id"
+      : "SELECT * FROM game WHERE decommissioned_at IS NULL ORDER BY game_id"
+    const { rows } = await pool.query(query)
     res.json(rows)
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
@@ -125,10 +185,33 @@ router.put("/games/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
+// Soft delete — mark as decommissioned, preserve historical sales data
 router.delete("/games/:id", async (req, res) => {
   try {
-    await pool.query("DELETE FROM game WHERE game_id = $1", [req.params.id])
-    res.json({ message: "Deleted" })
+    const { rows } = await pool.query(
+      `UPDATE game
+         SET operational_status = 0, decommissioned_at = NOW()
+       WHERE game_id = $1
+       RETURNING *`,
+      [req.params.id]
+    )
+    if (rows.length === 0) return res.status(404).json({ message: "Game not found" })
+    res.json({ message: "Game decommissioned (soft-deleted)", game: rows[0] })
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+// Restore a decommissioned game
+router.patch("/games/:id/restore", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE game
+         SET operational_status = 1, decommissioned_at = NULL
+       WHERE game_id = $1
+       RETURNING *`,
+      [req.params.id]
+    )
+    if (rows.length === 0) return res.status(404).json({ message: "Game not found" })
+    res.json({ message: "Game restored", game: rows[0] })
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 

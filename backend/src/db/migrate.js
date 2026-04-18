@@ -1025,6 +1025,22 @@ const migrations = [
        WHERE phone IS NULL;
     `,
   },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION 11: VENUE SOFT-DELETE SUPPORT
+  // ═══════════════════════════════════════════════════════════════
+  // Mirror the rides decommissioning pattern for restaurant, gift_shop,
+  // and game. A non-null decommissioned_at marks the record as removed
+  // from customer views while preserving historical sales data.
+
+  {
+    name: "019_add_decommissioned_at_to_venues",
+    sql: `
+      ALTER TABLE restaurant ADD COLUMN IF NOT EXISTS decommissioned_at TIMESTAMPTZ;
+      ALTER TABLE gift_shop  ADD COLUMN IF NOT EXISTS decommissioned_at TIMESTAMPTZ;
+      ALTER TABLE game       ADD COLUMN IF NOT EXISTS decommissioned_at TIMESTAMPTZ;
+    `,
+  },
 ];
 
 const run = async () => {
