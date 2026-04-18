@@ -66,6 +66,10 @@ router.put("/:id", async (req, res) => {
     res.json(rows[0])
   } catch (err) {
     console.log("DB error:", err.message)
+    // Ride reopen guard rejection — surface as 409 Conflict
+    if (err.code === "RR001") {
+      return res.status(409).json({ message: err.message, code: err.code, hint: err.hint })
+    }
     res.status(500).json({ message: err.message })
   }
 })
@@ -115,6 +119,10 @@ router.patch("/:id/restore", async (req, res) => {
     res.json({ message: "Ride restored to operational", ride: rows[0] })
   } catch (err) {
     console.log("DB error:", err.message)
+    // Ride reopen guard rejection — surface as 409 Conflict
+    if (err.code === "RR001") {
+      return res.status(409).json({ message: err.message, code: err.code, hint: err.hint })
+    }
     res.status(500).json({ message: err.message })
   }
 })

@@ -80,7 +80,12 @@ export default function Rides() {
         }),
       })
       if (res.ok) { setEditItem(null); resetForm(); fetchRides() }
-      else { const d = await res.json(); alert(d.message || "Failed") }
+      else {
+        const d = await res.json()
+        // Ride reopen guard rejection — show rule + hint together
+        const msg = d.hint ? `${d.message}\n\n${d.hint}` : (d.message || "Failed")
+        alert(msg)
+      }
     } catch (err) { console.error(err) }
   }
 

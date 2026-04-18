@@ -143,7 +143,8 @@ export default function Staff() {
         fetchEmployees()
       } else {
         const d = await res.json()
-        setError(d.message || "Failed to delete")
+        const msg = d.hint ? `${d.message}\n${d.hint}` : (d.message || "Failed to delete")
+        setError(msg)
         setDeleteId(null)
       }
     } catch { setError("Network error"); setDeleteId(null) }
@@ -244,9 +245,10 @@ export default function Staff() {
             borderRadius: "12px",
             fontFamily: f,
             fontSize: "0.85rem",
-            color: "#EF9A9A"
+            color: "#EF9A9A",
+            whiteSpace: "pre-line"
           }}>
-            ❌ {error}
+            {error}
           </div>
         )}
 

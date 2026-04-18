@@ -2,11 +2,14 @@ const { Router } = require("../lib/router")
 const router = Router()
 const pool = require("../config/db")
 
-// GET all employees (for dropdowns and staff page)
+// GET all employees (for dropdowns and staff page) — only active employees
 router.get("/", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT employee_id, full_name, email, role, hourly_rate, ride_id, shift_start, shift_end, hire_date FROM employees ORDER BY full_name"
+      `SELECT employee_id, full_name, email, role, hourly_rate, ride_id, shift_start, shift_end, hire_date
+       FROM employees
+       WHERE is_active = true
+       ORDER BY full_name`
     )
     res.json(rows)
   } catch (err) {
@@ -57,7 +60,7 @@ router.put("/:id", async (req, res) => {
   }
 })
 
-// DELETE an employee (hard delete)
+// DELETE an employee (soft delete — fires fn_guard_employee_deactivation trigger)
 router.delete("/:id", async (req, res) => {
   const { id } = req.params
 
@@ -71,8 +74,13 @@ router.delete("/:id", async (req, res) => {
       return res.status(403).json({ message: "Admin accounts cannot be deleted" })
     }
 
+    // Soft delete: flip is_active — the deactivation guard trigger validates
+    // that no active operator assignments or open maintenance tasks exist.
     const { rows } = await pool.query(
-      "DELETE FROM employees WHERE employee_id = $1 RETURNING *",
+      `UPDATE employees
+       SET is_active = false
+       WHERE employee_id = $1
+       RETURNING *`,
       [id]
     )
 
@@ -80,14 +88,13 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ message: "Employee not found" })
     }
 
-    // Also delete the linked user account if exists
-    if (rows[0].user_id) {
-      await pool.query("DELETE FROM users WHERE id = $1", [rows[0].user_id])
-    }
-
-    res.json({ message: "Employee deleted", employee: rows[0] })
+    res.json({ message: "Employee deactivated", employee: rows[0] })
   } catch (err) {
     console.log("DB error:", err.message)
+    // Trigger rejection — surface as 409 Conflict with the raised message
+    if (err.code === "ED001" || err.code === "ED002") {
+      return res.status(409).json({ message: err.message, code: err.code, hint: err.hint })
+    }
     res.status(500).json({ message: err.message })
   }
 })
