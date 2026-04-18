@@ -20,6 +20,15 @@ router.put("/:id", async (req, res) => {
   const { role, hourly_rate, shift_start, shift_end, ride_id } = req.body
 
   try {
+    // Block edits to admin-role employees (admins cannot modify other admins or themselves)
+    const check = await pool.query("SELECT role FROM employees WHERE employee_id = $1", [id])
+    if (check.rows.length === 0) {
+      return res.status(404).json({ message: "Employee not found" })
+    }
+    if (check.rows[0].role === "admin") {
+      return res.status(403).json({ message: "Admin accounts cannot be edited" })
+    }
+
     const { rows } = await pool.query(
       `UPDATE employees
        SET role        = COALESCE($1, role),
@@ -53,6 +62,15 @@ router.delete("/:id", async (req, res) => {
   const { id } = req.params
 
   try {
+    // Block deletion of admin-role employees
+    const check = await pool.query("SELECT role FROM employees WHERE employee_id = $1", [id])
+    if (check.rows.length === 0) {
+      return res.status(404).json({ message: "Employee not found" })
+    }
+    if (check.rows[0].role === "admin") {
+      return res.status(403).json({ message: "Admin accounts cannot be deleted" })
+    }
+
     const { rows } = await pool.query(
       "DELETE FROM employees WHERE employee_id = $1 RETURNING *",
       [id]

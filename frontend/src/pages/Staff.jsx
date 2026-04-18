@@ -861,10 +861,14 @@ export default function Staff() {
                     </td>
                     {isAdmin && (
                       <td style={{ padding: "1rem 1.5rem" }}>
-                        <div style={{ display: "flex", gap: "0.5rem" }}>
-                          <button onClick={() => openEdit(emp)} style={{ fontFamily: f, fontSize: "0.75rem", fontWeight: 600, padding: "0.3rem 0.75rem", borderRadius: "6px", cursor: "pointer", background: "rgba(59,130,246,0.15)", color: "#60A5FA", border: "1px solid rgba(59,130,246,0.3)", transition: "all 0.15s" }}>Edit</button>
-                          <button onClick={() => setDeleteId(emp.employee_id)} style={{ fontFamily: f, fontSize: "0.75rem", fontWeight: 600, padding: "0.3rem 0.75rem", borderRadius: "6px", cursor: "pointer", background: "rgba(239,68,68,0.15)", color: "#F87171", border: "1px solid rgba(239,68,68,0.3)", transition: "all 0.15s" }}>Delete</button>
-                        </div>
+                        {emp.role === "admin" ? (
+                          <span style={{ fontFamily: f, fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", fontStyle: "italic" }}>Protected</span>
+                        ) : (
+                          <div style={{ display: "flex", gap: "0.5rem" }}>
+                            <button onClick={() => openEdit(emp)} style={{ fontFamily: f, fontSize: "0.75rem", fontWeight: 600, padding: "0.3rem 0.75rem", borderRadius: "6px", cursor: "pointer", background: "rgba(59,130,246,0.15)", color: "#60A5FA", border: "1px solid rgba(59,130,246,0.3)", transition: "all 0.15s" }}>Edit</button>
+                            <button onClick={() => setDeleteId(emp.employee_id)} style={{ fontFamily: f, fontSize: "0.75rem", fontWeight: 600, padding: "0.3rem 0.75rem", borderRadius: "6px", cursor: "pointer", background: "rgba(239,68,68,0.15)", color: "#F87171", border: "1px solid rgba(239,68,68,0.3)", transition: "all 0.15s" }}>Delete</button>
+                          </div>
+                        )}
                       </td>
                     )}
                   </tr>
