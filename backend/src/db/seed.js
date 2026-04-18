@@ -13,9 +13,6 @@ async function resetAndSeed() {
     await client.query("DELETE FROM ride_dispatch_queue");
     await client.query("DELETE FROM ride_dispatches");
     await client.query("DELETE FROM operator_assignments");
-    await client.query("DELETE FROM incident_tracking");
-    await client.query("DELETE FROM sms_queue");
-    await client.query("DELETE FROM email_queue");
     await client.query("DELETE FROM notifications");
     await client.query("DELETE FROM ticket_purchases");
     await client.query("DELETE FROM maintenance_requests");

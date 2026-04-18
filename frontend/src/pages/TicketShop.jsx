@@ -32,7 +32,6 @@ export default function TicketShop() {
   const [processing, setProcessing] = useState(false)
   const [order, setOrder] = useState(null)
   const [error, setError] = useState("")
-  const [maxQtyPerTxn, setMaxQtyPerTxn] = useState(20)
   const [parkClosures, setParkClosures] = useState([])
 
   useEffect(() => {
@@ -57,12 +56,6 @@ export default function TicketShop() {
       }
     }
     loadTicketTypes()
-
-    // Load purchase limits (public endpoint)
-    fetch(`${API_BASE_URL}/api/tickets/purchase-limits`)
-      .then(r => r.ok ? r.json() : { max_qty_per_txn: 20 })
-      .then(limits => { if (limits.max_qty_per_txn) setMaxQtyPerTxn(limits.max_qty_per_txn) })
-      .catch(() => {})
 
     // Load park closures for visit date validation
     fetch(`${API_BASE_URL}/api/park-ops/park-closures`)
@@ -93,35 +86,18 @@ export default function TicketShop() {
     const totalQty = getTotalQty()
 
     if (!visitDate) {
-      return "POLICY VIOLATION: VISIT_DATE_INVALID\nPlease select a visit date before proceeding"
+      return "Please select a visit date before proceeding"
     }
     if (visitDate < today) {
-      return "POLICY VIOLATION: VISIT_DATE_INVALID\nVisit date must be today or in the future"
+      return "Visit date must be today or in the future"
     }
     if (totalQty <= 0) {
-      return "POLICY VIOLATION: INVALID_QUANTITY\nTransaction must include at least one adult or child ticket"
-    }
-    if (totalQty > maxQtyPerTxn) {
-      return `POLICY VIOLATION: QUANTITY_EXCEEDED\nTransaction quantity ${totalQty} exceeds per-transaction maximum of ${maxQtyPerTxn}`
+      return "Your cart must include at least one adult or child ticket"
     }
     if (isDateParkClosed(visitDate)) {
-      return `POLICY VIOLATION: PARK_CLOSED_VISIT_DATE\nThe park is closed on ${visitDate}. Tickets cannot be purchased for that date.`
+      return `The park is closed on ${visitDate}. Please select a different date.`
     }
     return null
-  }
-
-  function logRejection(code, detail) {
-    const firstType = cart.length > 0 ? cart[0].ticket_type : "Unknown"
-    fetch(`${API_BASE_URL}/api/tickets/log-rejection`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        rejection_code: code,
-        rejection_detail: detail,
-        ticket_type: firstType,
-        context_data: { visit_date: visitDate, total_qty: getTotalQty(), max_qty: maxQtyPerTxn, cart },
-      }),
-    }).catch(() => {})
   }
 
   function addToCart(ticketId, type) {
@@ -167,11 +143,6 @@ export default function TicketShop() {
       })
       const data = await res.json()
       if (res.ok) { setOrder(data); setStep("confirmation"); setCart([]) }
-      else if (data.trigger_rejection) {
-        // Extract the rejection code from the trigger message
-        const match = data.message.match(/rejected: (\w+) — (.+)/)
-        setError(`POLICY VIOLATION: ${match ? match[1] : 'UNKNOWN'}\n${match ? match[2] : data.message}`)
-      }
       else { setError(data.message || "Purchase failed") }
     } catch { setError("Network error — please try again") }
     finally { setProcessing(false) }
@@ -392,13 +363,6 @@ export default function TicketShop() {
                   })}
                 </div>
 
-                {/* Quantity warning */}
-                {getTotalQty() > maxQtyPerTxn && (
-                  <div style={{ padding: "12px 16px", borderRadius: "10px", background: "rgba(229,57,53,0.08)", border: "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.82rem", color: "#E53935", marginBottom: "1rem", fontWeight: 600 }}>
-                    POLICY VIOLATION: QUANTITY_EXCEEDED — {getTotalQty()} tickets exceeds the per-transaction maximum of {maxQtyPerTxn}
-                  </div>
-                )}
-
                 {/* Visit date */}
                 <div style={{ background: "var(--cr-surface)", borderRadius: "14px", border: `1px solid ${!visitDate || visitDate < new Date().toISOString().split("T")[0] || isDateParkClosed(visitDate) ? "var(--cr-red)" : "var(--cr-border)"}`, padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
                   <label style={labelSt}>Visit Date <span style={{ color: "var(--cr-red)" }}>*</span></label>
@@ -408,12 +372,12 @@ export default function TicketShop() {
                     style={{ ...inputSt, width: "auto", colorScheme: "light" }} />
                   {visitDate && visitDate < new Date().toISOString().split("T")[0] && (
                     <p style={{ fontFamily: f, fontSize: "0.8rem", color: "#E53935", marginTop: "0.5rem", fontWeight: 600 }}>
-                      POLICY VIOLATION: VISIT_DATE_INVALID — Visit date must be today or in the future
+                      Visit date must be today or in the future
                     </p>
                   )}
                   {visitDate && isDateParkClosed(visitDate) && !(visitDate < new Date().toISOString().split("T")[0]) && (
                     <p style={{ fontFamily: f, fontSize: "0.8rem", color: "#E53935", marginTop: "0.5rem", fontWeight: 600 }}>
-                      POLICY VIOLATION: PARK_CLOSED_VISIT_DATE — The park is closed on this date. Please select a different date.
+                      The park is closed on this date. Please select a different date.
                     </p>
                   )}
                   {!visitDate && (
@@ -435,16 +399,12 @@ export default function TicketShop() {
                   <div>
                     <div style={{ fontFamily: f, fontSize: "0.65rem", color: "#aaa", textTransform: "uppercase", letterSpacing: "1px" }}>Order Total</div>
                     <div style={{ fontFamily: fh, fontSize: "2rem", fontWeight: 800, color: "#111827" }}>${getTotal()}</div>
-                    <div style={{ fontFamily: f, fontSize: "0.7rem", color: "#999", marginTop: "2px" }}>{getTotalQty()} ticket(s) — max {maxQtyPerTxn} per transaction</div>
+                    <div style={{ fontFamily: f, fontSize: "0.7rem", color: "#999", marginTop: "2px" }}>{getTotalQty()} ticket(s)</div>
                   </div>
                   <button onClick={() => {
                     const violation = validateCart()
                     if (violation) {
                       setError(violation)
-                      // Log the rejection to the backend
-                      const codeMatch = violation.match(/POLICY VIOLATION: (\w+)/)
-                      const detailMatch = violation.split("\n")[1]
-                      if (codeMatch) logRejection(codeMatch[1], detailMatch || violation)
                       return
                     }
                     setError("")
@@ -522,7 +482,7 @@ export default function TicketShop() {
                   </div>
 
                   {error && (
-                    <div style={{ padding: "14px 18px", borderRadius: "10px", background: error.includes("POLICY VIOLATION") ? "rgba(229,57,53,0.15)" : "rgba(229,57,53,0.08)", border: error.includes("POLICY VIOLATION") ? "2px solid rgba(229,57,53,0.5)" : "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.85rem", color: "#E53935", marginBottom: "1rem", whiteSpace: "pre-line", fontWeight: 600 }}>{error}</div>
+                    <div style={{ padding: "14px 18px", borderRadius: "10px", background: "rgba(229,57,53,0.08)", border: "1px solid rgba(229,57,53,0.25)", fontFamily: f, fontSize: "0.85rem", color: "#E53935", marginBottom: "1rem", whiteSpace: "pre-line", fontWeight: 600 }}>{error}</div>
                   )}
 
                   <button type="submit" disabled={processing} style={{
