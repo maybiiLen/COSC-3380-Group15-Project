@@ -18,7 +18,7 @@ const thrillColor = (t) => {
 
 const customerStatus = (s) => {
   if (s === "Operational") return { label: "Open", bg: "rgba(76,175,80,0.1)", color: "#2E7D32" }
-  if (s === "Maintenance") return { label: "Maintenance", bg: "rgba(255,183,77,0.1)", color: "#E65100" }
+  if (s === "Maintenance") return { label: "Closed for Maintenance", bg: "rgba(255,183,77,0.1)", color: "#E65100" }
   return { label: "Closed", bg: "rgba(244,67,54,0.1)", color: "#C62828" }
 }
 

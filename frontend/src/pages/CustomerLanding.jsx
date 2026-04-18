@@ -388,7 +388,7 @@ function RidesSection({ initialZone }) {
 
   const customerStatus = (status) => {
     if (status === "Operational") return { label: "Open", color: "#4CAF50" }
-    if (status === "Maintenance") return { label: "Temporarily Closed", color: "#FF9800" }
+    if (status === "Maintenance") return { label: "Closed for Maintenance", color: "#FF9800" }
     return { label: "Closed", color: "#E53935" }
   }
 
