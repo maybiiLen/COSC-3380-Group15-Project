@@ -387,7 +387,7 @@ function EventRoutingPanel() {
   }
 
   async function clearQueues() {
-    if (!confirm("Clear all incident tracking, SMS, and email queues?")) return
+    if (!confirm("Clear all incident tracking and email queues?")) return
     try {
       await fetch(`${API_BASE_URL}/api/maintenance/event-routing/clear`, { method: "POST" })
       loadData()
@@ -402,7 +402,7 @@ function EventRoutingPanel() {
     active: "bg-red-100 text-red-700",
     resolved: "bg-green-100 text-green-700",
   }
-  const smsPriorityColor = {
+  const priorityColor = {
     highest: "bg-purple-100 text-purple-700",
     high: "bg-red-100 text-red-700",
     normal: "bg-gray-100 text-gray-700",
@@ -414,7 +414,7 @@ function EventRoutingPanel() {
         <div>
           <h2 className="text-xl font-bold text-gray-900">Event Routing Monitor</h2>
           <p className="text-sm text-gray-500">
-            Trigger 2 classifies maintenance events into 7 types and fans out to in-app notifications, SMS queue, and email queue with deduplication and pattern detection
+            Trigger classifies maintenance events and fans out role-differentiated in-app notifications with deduplication and pattern detection
           </p>
         </div>
         <div className="flex gap-2">
@@ -451,7 +451,7 @@ function EventRoutingPanel() {
               ))}
             </div>
             <p className="text-xs text-indigo-600 mt-2">
-              Create/edit maintenance requests above to trigger events. Critical priority triggers SMS + incident tracking. 3+ Criticals on same ride in 7 days triggers REPEATED_FAILURE with email queue.
+              Create/edit maintenance requests above to trigger events. Critical priority triggers incident tracking. 3+ Criticals on same ride in 7 days triggers REPEATED_FAILURE with email queue. Managers receive full details; assigned staff receive task assignments with the manager's name.
             </p>
           </div>
 
@@ -524,53 +524,6 @@ function EventRoutingPanel() {
             )}
           </div>
 
-          {/* SMS Queue */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="font-semibold text-gray-800 text-sm">SMS Queue (Critical/Repeated Failure fan-out)</h3>
-              <span className="text-xs text-gray-400">{data.sms_queue?.length || 0} message(s)</span>
-            </div>
-            {data.sms_queue?.length > 0 ? (
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">Recipient</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">Phone</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">Priority</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">Message</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">Status</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">Queued</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {data.sms_queue.map(sms => (
-                    <tr key={sms.sms_id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 font-medium text-gray-900">{sms.recipient_name}</td>
-                      <td className="px-3 py-2 text-gray-600">{sms.recipient_phone}</td>
-                      <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${smsPriorityColor[sms.priority] || "bg-gray-100 text-gray-700"}`}>
-                          {sms.priority}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-gray-600 max-w-xs truncate">{sms.message_body}</td>
-                      <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${
-                          sms.status === 'sent' ? 'bg-green-100 text-green-700' :
-                          sms.status === 'failed' ? 'bg-red-100 text-red-700' :
-                          sms.status === 'sending' ? 'bg-blue-100 text-blue-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>{sms.status}</span>
-                      </td>
-                      <td className="px-3 py-2 text-gray-500">{new Date(sms.queued_at).toLocaleTimeString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="px-4 py-4 text-gray-400 text-xs text-center">No SMS queued. Critical events trigger SMS to on-call managers.</p>
-            )}
-          </div>
-
           {/* Email Queue */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
@@ -594,7 +547,7 @@ function EventRoutingPanel() {
                       <td className="px-3 py-2 text-gray-600">{em.recipient_email}</td>
                       <td className="px-3 py-2 font-medium text-gray-900 max-w-xs truncate">{em.subject}</td>
                       <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${smsPriorityColor[em.priority] || "bg-gray-100 text-gray-700"}`}>
+                        <span className={`px-2 py-0.5 rounded-full font-medium ${priorityColor[em.priority] || "bg-gray-100 text-gray-700"}`}>
                           {em.priority}
                         </span>
                       </td>

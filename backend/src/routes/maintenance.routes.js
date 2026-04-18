@@ -504,15 +504,12 @@ router.get("/dispatch/rejections", async (req, res) => {
 // GET /event-routing/status — Full dashboard data for the event routing panel
 router.get("/event-routing/status", async (req, res) => {
   try {
-    const [incidents, sms, emails, interlocks] = await Promise.all([
+    const [incidents, emails, interlocks] = await Promise.all([
       pool.query(`
         SELECT it.*, r.ride_name
         FROM incident_tracking it
         JOIN rides r ON r.ride_id = it.ride_id
         ORDER BY it.created_at DESC LIMIT 20
-      `),
-      pool.query(`
-        SELECT * FROM sms_queue ORDER BY queued_at DESC LIMIT 20
       `),
       pool.query(`
         SELECT * FROM email_queue ORDER BY queued_at DESC LIMIT 20
@@ -527,7 +524,6 @@ router.get("/event-routing/status", async (req, res) => {
     ])
     res.json({
       incidents: incidents.rows,
-      sms_queue: sms.rows,
       email_queue: emails.rows,
       interlocks: interlocks.rows,
     })
@@ -540,7 +536,6 @@ router.get("/event-routing/status", async (req, res) => {
 router.post("/event-routing/clear", async (req, res) => {
   try {
     await Promise.all([
-      pool.query("DELETE FROM sms_queue"),
       pool.query("DELETE FROM email_queue"),
       pool.query("DELETE FROM incident_tracking"),
     ])

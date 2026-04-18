@@ -791,6 +791,7 @@ const migrations = [
       END;
       $$ LANGUAGE plpgsql;
 
+      DROP TRIGGER IF EXISTS trg_route_maintenance_event ON maintenance_requests;
       CREATE TRIGGER trg_route_maintenance_event
       AFTER INSERT OR UPDATE ON maintenance_requests
       FOR EACH ROW
@@ -939,6 +940,7 @@ const migrations = [
       END;
       $$ LANGUAGE plpgsql;
 
+      DROP TRIGGER IF EXISTS trg_enforce_dispatch_envelope ON ride_dispatches;
       CREATE TRIGGER trg_enforce_dispatch_envelope
       BEFORE INSERT ON ride_dispatches
       FOR EACH ROW
@@ -1039,6 +1041,338 @@ const migrations = [
       ALTER TABLE restaurant ADD COLUMN IF NOT EXISTS decommissioned_at TIMESTAMPTZ;
       ALTER TABLE gift_shop  ADD COLUMN IF NOT EXISTS decommissioned_at TIMESTAMPTZ;
       ALTER TABLE game       ADD COLUMN IF NOT EXISTS decommissioned_at TIMESTAMPTZ;
+    `,
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION 12: REPLACE MAINTENANCE TRIGGER — DASHBOARD-ONLY
+  // ═══════════════════════════════════════════════════════════════
+  // Drops SMS fan-out. Role-differentiated in-app notifications:
+  //   - MANAGER receives the full maintenance request details
+  //     (priority, ride, description, assigned staff, incident info)
+  //   - ASSIGNED STAFF receives a task-assignment notification with
+  //     the manager's name ("You've been assigned X by Srinath")
+
+  {
+    name: "020_maintenance_trigger_dashboard_only",
+    sql: `
+      CREATE OR REPLACE FUNCTION fn_route_maintenance_event()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_event_class        VARCHAR(50);
+        v_ride               rides%ROWTYPE;
+        v_assigned_employee  employees%ROWTYPE;
+        v_recent_critical    INTEGER;
+        v_existing_incident  RECORD;
+        v_on_call_manager    RECORD;
+        v_interlocked_ride   RECORD;
+        v_manager_label      TEXT;
+        v_dedup_window       INTERVAL := INTERVAL '10 minutes';
+        v_pattern_window     INTERVAL := INTERVAL '7 days';
+        v_pattern_threshold  INTEGER  := 3;
+      BEGIN
+        -- PHASE 1: EVENT CLASSIFICATION
+        IF TG_OP = 'INSERT' AND NEW.priority = 'Critical' THEN
+          v_event_class := 'CRITICAL_ESCALATION';
+        ELSIF TG_OP = 'INSERT' AND NEW.priority = 'High' THEN
+          v_event_class := 'HIGH_ALERT';
+        ELSIF TG_OP = 'INSERT' AND NEW.priority IN ('Low', 'Medium') THEN
+          v_event_class := 'NEW_REQUEST';
+        ELSIF TG_OP = 'UPDATE' AND NEW.priority = 'Critical'
+              AND (OLD.priority IS NULL OR OLD.priority != 'Critical') THEN
+          v_event_class := 'CRITICAL_ESCALATION';
+        ELSIF TG_OP = 'UPDATE' AND NEW.priority = 'High'
+              AND (OLD.priority IS NULL OR OLD.priority NOT IN ('Critical', 'High')) THEN
+          v_event_class := 'HIGH_ALERT';
+        ELSIF TG_OP = 'UPDATE' AND NEW.status = 'Completed'
+              AND (OLD.status IS NULL OR OLD.status != 'Completed') THEN
+          v_event_class := 'COMPLETION';
+        ELSIF TG_OP = 'UPDATE' AND NEW.status = 'In Progress'
+              AND (OLD.status IS NULL OR OLD.status != 'In Progress') THEN
+          v_event_class := 'STATUS_PROGRESSION';
+        ELSIF TG_OP = 'UPDATE' AND OLD.employee_id IS NOT NULL
+              AND NEW.employee_id IS NOT NULL
+              AND OLD.employee_id != NEW.employee_id THEN
+          v_event_class := 'REASSIGNMENT';
+        ELSIF TG_OP = 'UPDATE' AND OLD.employee_id IS NULL
+              AND NEW.employee_id IS NOT NULL THEN
+          v_event_class := 'ASSIGNMENT';
+        ELSE
+          RETURN NEW;
+        END IF;
+
+        -- PHASE 2: LOAD CONTEXT (cross-table lookups)
+        SELECT * INTO v_ride FROM rides WHERE ride_id = NEW.ride_id;
+
+        IF NEW.employee_id IS NOT NULL THEN
+          SELECT * INTO v_assigned_employee
+            FROM employees WHERE employee_id = NEW.employee_id;
+        END IF;
+
+        SELECT employee_id, full_name, email, user_id
+          INTO v_on_call_manager
+          FROM employees
+         WHERE role = 'manager'
+           AND is_active = true
+         ORDER BY employee_id
+         LIMIT 1;
+
+        v_manager_label := COALESCE(v_on_call_manager.full_name, 'management');
+
+        -- PHASE 3: PATTERN DETECTION (cross-row temporal query)
+        IF v_event_class = 'CRITICAL_ESCALATION' THEN
+          SELECT COUNT(*) INTO v_recent_critical
+            FROM maintenance_requests
+           WHERE ride_id = NEW.ride_id
+             AND priority = 'Critical'
+             AND created_at >= NOW() - v_pattern_window
+             AND request_id != NEW.request_id;
+
+          IF v_recent_critical >= (v_pattern_threshold - 1) THEN
+            v_event_class := 'REPEATED_FAILURE';
+          END IF;
+        END IF;
+
+        -- PHASE 4: DEDUPLICATION (cross-table query on incident_tracking)
+        IF v_event_class IN ('CRITICAL_ESCALATION', 'REPEATED_FAILURE') THEN
+          SELECT * INTO v_existing_incident
+            FROM incident_tracking
+           WHERE ride_id = NEW.ride_id
+             AND incident_status = 'active'
+             AND created_at >= NOW() - v_dedup_window
+           ORDER BY created_at DESC
+           LIMIT 1;
+
+          IF FOUND THEN
+            UPDATE incident_tracking
+               SET related_request_ids = array_append(related_request_ids, NEW.request_id),
+                   last_event_at = NOW(),
+                   event_count = event_count + 1
+             WHERE incident_id = v_existing_incident.incident_id;
+
+            PERFORM fn_create_notification(
+              'manager', v_on_call_manager.user_id, 'incident_update',
+              format('Update on %s incident', v_ride.ride_name),
+              format('Additional %s-priority event on active incident. Priority: %s | Ride: %s | Details: %s',
+                     NEW.priority, NEW.priority, v_ride.ride_name, NEW.description),
+              'maintenance_requests', NEW.request_id
+            );
+
+            RETURN NEW;
+          END IF;
+
+          INSERT INTO incident_tracking (
+            ride_id, triggering_request_id, severity, incident_status,
+            related_request_ids, event_count, created_at, last_event_at
+          )
+          VALUES (
+            NEW.ride_id, NEW.request_id,
+            CASE WHEN v_event_class = 'REPEATED_FAILURE' THEN 'severe' ELSE 'critical' END,
+            'active', ARRAY[NEW.request_id], 1, NOW(), NOW()
+          );
+        END IF;
+
+        -- PHASE 5: BRANCH BY EVENT CLASS (dashboard notifications only)
+
+        IF v_event_class = 'NEW_REQUEST' THEN
+          -- MANAGER: full maintenance request details
+          PERFORM fn_create_notification(
+            'manager', v_on_call_manager.user_id, 'maintenance_new',
+            format('New Maintenance Request: %s', v_ride.ride_name),
+            format('Priority: %s | Ride: %s | Details: %s | Assigned to: %s',
+                   NEW.priority, v_ride.ride_name, NEW.description,
+                   COALESCE(v_assigned_employee.full_name, 'unassigned')),
+            'maintenance_requests', NEW.request_id
+          );
+
+          -- STAFF (if assigned): task assignment with manager name
+          IF v_assigned_employee.user_id IS NOT NULL THEN
+            PERFORM fn_create_notification(
+              'staff', v_assigned_employee.user_id, 'task_assigned',
+              format('New Task Assigned: %s', v_ride.ride_name),
+              format('You have been assigned a %s priority task on %s by %s. Details: %s',
+                     NEW.priority, v_ride.ride_name, v_manager_label, NEW.description),
+              'maintenance_requests', NEW.request_id
+            );
+          END IF;
+
+        ELSIF v_event_class = 'CRITICAL_ESCALATION' THEN
+          -- MANAGER: full critical details
+          PERFORM fn_create_notification(
+            'manager', v_on_call_manager.user_id, 'critical_alert',
+            format('CRITICAL: %s', v_ride.ride_name),
+            format('Priority: Critical | Ride: %s | Details: %s | Assigned to: %s',
+                   v_ride.ride_name, NEW.description,
+                   COALESCE(v_assigned_employee.full_name, 'unassigned')),
+            'maintenance_requests', NEW.request_id
+          );
+
+          -- ASSIGNED STAFF: urgent assignment with manager name
+          IF v_assigned_employee.user_id IS NOT NULL THEN
+            PERFORM fn_create_notification(
+              'staff', v_assigned_employee.user_id, 'critical_alert',
+              format('CRITICAL TASK: %s', v_ride.ride_name),
+              format('You have been assigned a CRITICAL task on %s by %s. Immediate attention required. Details: %s',
+                     v_ride.ride_name, v_manager_label, NEW.description),
+              'maintenance_requests', NEW.request_id
+            );
+          END IF;
+
+        ELSIF v_event_class = 'HIGH_ALERT' THEN
+          -- MANAGER: full high-priority details
+          PERFORM fn_create_notification(
+            'manager', v_on_call_manager.user_id, 'high_alert',
+            format('HIGH PRIORITY: %s', v_ride.ride_name),
+            format('Priority: High | Ride: %s | Details: %s | Assigned to: %s',
+                   v_ride.ride_name, NEW.description,
+                   COALESCE(v_assigned_employee.full_name, 'unassigned')),
+            'maintenance_requests', NEW.request_id
+          );
+
+          -- ASSIGNED STAFF
+          IF v_assigned_employee.user_id IS NOT NULL THEN
+            PERFORM fn_create_notification(
+              'staff', v_assigned_employee.user_id, 'high_alert',
+              format('HIGH PRIORITY TASK: %s', v_ride.ride_name),
+              format('You have been assigned a High priority task on %s by %s. Details: %s',
+                     v_ride.ride_name, v_manager_label, NEW.description),
+              'maintenance_requests', NEW.request_id
+            );
+          END IF;
+
+        ELSIF v_event_class = 'REPEATED_FAILURE' THEN
+          -- MANAGER: reliability alert with pattern context
+          PERFORM fn_create_notification(
+            'manager', v_on_call_manager.user_id, 'repeated_failure_alert',
+            format('REPEATED FAILURE: %s', v_ride.ride_name),
+            format('%s has had %s Critical failures in the last 7 days. Underlying reliability investigation required. Latest: %s',
+                   v_ride.ride_name, v_recent_critical + 1, NEW.description),
+            'maintenance_requests', NEW.request_id
+          );
+
+          -- ASSIGNED STAFF
+          IF v_assigned_employee.user_id IS NOT NULL THEN
+            PERFORM fn_create_notification(
+              'staff', v_assigned_employee.user_id, 'repeated_failure_alert',
+              format('URGENT TASK: %s', v_ride.ride_name),
+              format('You have been assigned an urgent task on %s by %s. This ride has had %s Critical failures in the last 7 days. Details: %s',
+                     v_ride.ride_name, v_manager_label, v_recent_critical + 1, NEW.description),
+              'maintenance_requests', NEW.request_id
+            );
+          END IF;
+
+        ELSIF v_event_class = 'ASSIGNMENT' THEN
+          -- STAFF: task assignment with manager name
+          IF v_assigned_employee.user_id IS NOT NULL THEN
+            PERFORM fn_create_notification(
+              'staff', v_assigned_employee.user_id, 'task_assigned',
+              format('New Task Assigned: %s', v_ride.ride_name),
+              format('You have been assigned a %s priority task on %s by %s. Details: %s',
+                     NEW.priority, v_ride.ride_name, v_manager_label, NEW.description),
+              'maintenance_requests', NEW.request_id
+            );
+          ELSE
+            PERFORM fn_create_notification(
+              'manager', v_on_call_manager.user_id, 'assignment_unreachable',
+              format('Unreachable assignment: %s', v_ride.ride_name),
+              format('Task assigned to %s but they have no active user account.',
+                     COALESCE(v_assigned_employee.full_name, 'unknown employee')),
+              'maintenance_requests', NEW.request_id
+            );
+          END IF;
+
+        ELSIF v_event_class = 'REASSIGNMENT' THEN
+          -- OLD STAFF: notify task moved away
+          PERFORM fn_create_notification(
+            'staff',
+            (SELECT user_id FROM employees WHERE employee_id = OLD.employee_id),
+            'task_reassigned_from',
+            format('Task transferred: %s', v_ride.ride_name),
+            format('Your task on %s has been reassigned to another technician by %s.',
+                   v_ride.ride_name, v_manager_label),
+            'maintenance_requests', NEW.request_id
+          );
+
+          -- NEW STAFF: notify task moved to them
+          IF v_assigned_employee.user_id IS NOT NULL THEN
+            PERFORM fn_create_notification(
+              'staff', v_assigned_employee.user_id, 'task_reassigned_to',
+              format('Transferred Task: %s', v_ride.ride_name),
+              format('A %s priority task on %s has been transferred to you by %s. Details: %s',
+                     NEW.priority, v_ride.ride_name, v_manager_label, NEW.description),
+              'maintenance_requests', NEW.request_id
+            );
+          END IF;
+
+          -- MANAGER: confirm reassignment
+          PERFORM fn_create_notification(
+            'manager', v_on_call_manager.user_id, 'reassignment_confirmed',
+            format('Reassigned: %s', v_ride.ride_name),
+            format('Request #%s on %s has been reassigned to %s.',
+                   NEW.request_id, v_ride.ride_name,
+                   COALESCE(v_assigned_employee.full_name, 'unassigned')),
+            'maintenance_requests', NEW.request_id
+          );
+
+        ELSIF v_event_class = 'STATUS_PROGRESSION' THEN
+          PERFORM fn_create_notification(
+            'manager', v_on_call_manager.user_id, 'work_started',
+            format('Work started: %s', v_ride.ride_name),
+            format('%s has begun work on %s (Request #%s)',
+                   COALESCE(v_assigned_employee.full_name, 'A technician'),
+                   v_ride.ride_name, NEW.request_id),
+            'maintenance_requests', NEW.request_id
+          );
+
+        ELSIF v_event_class = 'COMPLETION' THEN
+          IF EXISTS (SELECT 1 FROM rides WHERE ride_id = NEW.ride_id AND status = 'Operational') THEN
+            PERFORM fn_create_notification(
+              'staff', NULL, 'ride_reopened',
+              format('%s is Back in Operation', v_ride.ride_name),
+              format('%s has been cleared and is now open for guests.%s',
+                     v_ride.ride_name,
+                     CASE WHEN v_assigned_employee.full_name IS NOT NULL
+                          THEN format(' Cleared by %s.', v_assigned_employee.full_name)
+                          ELSE '' END),
+              'rides', NEW.ride_id
+            );
+
+            UPDATE incident_tracking
+               SET incident_status = 'resolved', resolved_at = NOW()
+             WHERE ride_id = NEW.ride_id AND incident_status = 'active';
+          ELSE
+            PERFORM fn_create_notification(
+              'manager', v_on_call_manager.user_id, 'partial_completion',
+              format('Partial completion: %s', v_ride.ride_name),
+              format('Request #%s completed, but ride still has pending work.',
+                     NEW.request_id),
+              'maintenance_requests', NEW.request_id
+            );
+          END IF;
+        END IF;
+
+        -- PHASE 6: CROSS-RIDE INTERLOCK COORDINATION
+        IF v_event_class IN ('CRITICAL_ESCALATION', 'REPEATED_FAILURE') THEN
+          FOR v_interlocked_ride IN
+            SELECT r.ride_id, r.ride_name
+              FROM ride_interlocks ri
+              JOIN rides r ON r.ride_id = ri.blocking_ride_id
+             WHERE ri.ride_id = NEW.ride_id
+          LOOP
+            PERFORM fn_create_notification(
+              'staff', NULL, 'interlock_advisory',
+              format('Advisory: %s is down', v_ride.ride_name),
+              format('%s is experiencing a critical issue. Because %s is interlocked, ' ||
+                     'expect possible impacts to guest flow or evacuation routing.',
+                     v_ride.ride_name, v_interlocked_ride.ride_name),
+              'rides', v_interlocked_ride.ride_id
+            );
+          END LOOP;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
     `,
   },
 ];
