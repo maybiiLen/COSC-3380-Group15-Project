@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../utils/api'
 const REPORTS = [
   { id: 'maintenance', label: 'Maintenance Report', desc: 'Maintenance requests by ride, employee, closures, and alerts', tables: ['maintenance_requests', 'rides', 'employees', 'park_closures', 'notifications'] },
   { id: 'ticketSales', label: 'Ticket Sales Report', desc: 'Ticket purchases, revenue, and customer data', tables: ['ticket_purchases', 'customers', 'ticket_types'] },
-  { id: 'employeeActivity', label: 'Employee Activity Report', desc: 'Employee task assignments and performance', tables: ['employees', 'maintenance_requests', 'rides'] },
+  { id: 'rideOperations', label: 'Ride Operations Report', desc: 'Ride dispatches, guest throughput, operator performance, and rejection rates', tables: ['ride_dispatches', 'rides', 'employees', 'operator_assignments', 'dispatch_rejections'] },
 ]
 
 export default function Analytics() {
@@ -42,7 +42,7 @@ export default function Analytics() {
 
     const endpoint = selectedReport === 'maintenance' ? 'maintenance'
       : selectedReport === 'ticketSales' ? 'ticket-sales'
-      : 'employee-activity'
+      : 'ride-operations'
 
     const params = new URLSearchParams()
     Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v) })
@@ -63,7 +63,7 @@ export default function Analytics() {
     if (!selectedReport) return
     const endpoint = selectedReport === 'maintenance' ? 'maintenance'
       : selectedReport === 'ticketSales' ? 'ticket-sales'
-      : 'employee-activity'
+      : 'ride-operations'
 
     const params = new URLSearchParams()
     Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v) })
@@ -118,8 +118,8 @@ export default function Analytics() {
           <h2 className="text-lg font-bold text-gray-900 mb-4">{reportInfo?.label}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
-            {/* Ride filter — maintenance */}
-            {selectedReport === 'maintenance' && (
+            {/* Ride filter — maintenance, rideOperations */}
+            {['maintenance', 'rideOperations'].includes(selectedReport) && (
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Ride</label>
                 <select value={filters.ride_id} onChange={e => setFilters({...filters, ride_id: e.target.value})}
@@ -130,13 +130,13 @@ export default function Analytics() {
               </div>
             )}
 
-            {/* Employee filter — maintenance, employeeActivity */}
-            {['maintenance', 'employeeActivity'].includes(selectedReport) && (
+            {/* Employee filter — maintenance, rideOperations (operator) */}
+            {['maintenance', 'rideOperations'].includes(selectedReport) && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Employee</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{selectedReport === 'rideOperations' ? 'Operator' : 'Employee'}</label>
                 <select value={filters.employee_id} onChange={e => setFilters({...filters, employee_id: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#C8102E]">
-                  <option value="">All Employees</option>
+                  <option value="">{selectedReport === 'rideOperations' ? 'All Operators' : 'All Employees'}</option>
                   {employees.map(e => <option key={e.employee_id} value={e.employee_id}>{e.full_name}</option>)}
                 </select>
               </div>
@@ -156,8 +156,8 @@ export default function Analytics() {
               </div>
             )}
 
-            {/* Priority filter — maintenance, employeeActivity */}
-            {['maintenance', 'employeeActivity'].includes(selectedReport) && (
+            {/* Priority filter — maintenance */}
+            {selectedReport === 'maintenance' && (
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Priority</label>
                 <select value={filters.priority} onChange={e => setFilters({...filters, priority: e.target.value})}
@@ -264,14 +264,16 @@ export default function Analytics() {
             </>
           )}
 
-          {/* ─── Employee Activity Report Results ─── */}
-          {selectedReport === 'employeeActivity' && (
+          {/* ─── Ride Operations Report Results ─── */}
+          {selectedReport === 'rideOperations' && (
             <>
-              <ReportTable title="Employee Summary" columns={['Employee', 'Role', 'Rate', 'Tasks', 'Done', 'Active', 'Pending', 'Done %', 'Avg Hrs', 'Total Hrs', 'Labor Cost', 'Workload', 'Rides']}
-                rows={reportData.summary?.map(r => [r.employee_name, r.employee_role, r.hourly_rate ? `$${Number(r.hourly_rate).toFixed(2)}` : '—', r.total_tasks, r.completed_tasks, r.in_progress_tasks, r.pending_tasks, `${r.completion_rate}%`, r.avg_hours_to_complete ?? '—', `${r.total_hours_worked ?? '—'}h`, r.total_labor_cost ? `$${Number(r.total_labor_cost).toFixed(2)}` : '—', r.workload_ratio ? `${r.workload_ratio}x` : '—', r.rides_serviced])}
-                totals={reportData.totals ? ['TOTAL', `${reportData.totals.total_employees} emp`, '', reportData.totals.total_tasks, reportData.totals.completed, reportData.totals.in_progress, reportData.totals.pending, `${reportData.totals.completion_rate}%`, reportData.totals.avg_hours ?? '—', `${reportData.totals.total_hours_worked ?? '—'}h`, reportData.totals.total_labor_cost ? `$${Number(reportData.totals.total_labor_cost).toFixed(2)}` : '—', '', reportData.totals.rides_serviced] : null} />
-              <ReportTable title="Task Details" columns={['Employee', 'Role', 'Rate', 'Ride', 'Zone', 'Task', 'Priority', 'Status', 'Assigned', 'Completed', 'Hours', 'Elapsed', 'Labor Cost']}
-                rows={reportData.details?.map(r => [r.employee_name, r.employee_role, r.hourly_rate ? `$${Number(r.hourly_rate).toFixed(2)}` : '—', r.ride_name, r.ride_zone, r.task_description, r.priority, r.status, new Date(r.assigned_date).toLocaleDateString(), r.completed_at ? new Date(r.completed_at).toLocaleDateString() : '—', r.hours_to_complete ?? '—', r.elapsed_hours ? `${r.elapsed_hours}h` : '—', r.labor_cost ? `$${Number(r.labor_cost).toFixed(2)}` : '—'])} />
+              <ReportTable title="Throughput by Ride" columns={['Ride', 'Zone', 'Dispatches', 'Guests Served', 'Avg Guests/Run', 'Avg Cycle (s)', 'Min Cycle', 'Max Cycle', 'Operating Hrs', 'Operators', 'Rejections', 'Rejection %']}
+                rows={reportData.summary?.map(r => [r.ride_name, r.ride_zone, r.total_dispatches, r.total_guests_served, r.avg_guests_per_dispatch ?? '—', r.avg_cycle_seconds ?? '—', r.min_cycle_seconds ?? '—', r.max_cycle_seconds ?? '—', `${r.total_operating_hours ?? '—'}h`, r.distinct_operators, r.rejection_count, `${r.rejection_rate_pct ?? 0}%`])}
+                totals={reportData.totals ? ['TOTAL', `${reportData.totals.distinct_rides} rides`, reportData.totals.total_dispatches, reportData.totals.total_guests_served, reportData.totals.avg_guests_per_dispatch ?? '—', reportData.totals.avg_cycle_seconds ?? '—', '', '', `${reportData.totals.total_operating_hours ?? '—'}h`, reportData.totals.distinct_operators, reportData.totals.total_rejections, `${reportData.totals.rejection_rate_pct ?? 0}%`] : null} />
+              <ReportTable title="Operator Performance" columns={['Operator', 'Role', 'Dispatches Run', 'Guests Served', 'Avg Guests/Run', 'Operating Hrs', 'Rides Operated']}
+                rows={reportData.operatorSummary?.map(r => [r.operator_name, r.operator_role, r.dispatches_run, r.total_guests_served, r.avg_guests_per_dispatch ?? '—', `${r.total_operating_hours ?? '—'}h`, r.distinct_rides_operated])} />
+              <ReportTable title="Dispatch Details" columns={['ID', 'Dispatched At', 'Ride', 'Zone', 'Operator', 'Role', 'Guests', 'Cycle (s)', 'Cycle (min)', 'Notes']}
+                rows={reportData.details?.map(r => [`#${r.dispatch_id}`, new Date(r.dispatched_at).toLocaleString(), r.ride_name, r.ride_zone, r.operator_name, r.operator_role, r.guest_count, r.cycle_duration_s ?? '—', r.cycle_duration_min ?? '—', r.dispatch_notes || '—'])} />
             </>
           )}
 

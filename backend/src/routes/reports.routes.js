@@ -276,138 +276,153 @@ router.get("/ticket-sales", async (req, res) => {
   }
 })
 
-// ─── REPORT 4: Employee Activity (employees + maintenance_requests + rides) ───
-router.get("/employee-activity", async (req, res) => {
-  const { employee_id, start_date, end_date, priority, format } = req.query
+// ═══════════════════════════════════════════════════════════════════
+// REPORT 3: Ride Operations Report
+// Tables: ride_dispatches + rides + operator_assignments + employees + dispatch_rejections
+// Filters: ride, operator (employee_id), date range
+// Measures throughput (guests served, dispatches, cycle time), operator performance,
+//   and dispatch-rejection rate (safety interlocks, height checks, etc.)
+// ═══════════════════════════════════════════════════════════════════
+router.get("/ride-operations", async (req, res) => {
+  const { ride_id, employee_id, start_date, end_date, format } = req.query
 
   let conditions = []
   let params = []
   let idx = 1
 
-  if (employee_id && employee_id !== '') { conditions.push(`e.employee_id = $${idx++}`); params.push(parseInt(employee_id)) }
-  if (start_date && start_date !== '') { conditions.push(`m.created_at >= $${idx++}`); params.push(start_date) }
-  if (end_date && end_date !== '') { conditions.push(`m.created_at <= $${idx++}`); params.push(end_date + "T23:59:59") }
-  if (priority && priority !== '') { conditions.push(`m.priority = $${idx++}`); params.push(priority) }
+  if (ride_id && ride_id !== '') { conditions.push(`d.ride_id = $${idx++}`); params.push(parseInt(ride_id)) }
+  if (employee_id && employee_id !== '') { conditions.push(`d.operator_id = $${idx++}`); params.push(parseInt(employee_id)) }
+  if (start_date && start_date !== '') { conditions.push(`d.dispatched_at >= $${idx++}`); params.push(start_date) }
+  if (end_date && end_date !== '') { conditions.push(`d.dispatched_at <= $${idx++}`); params.push(end_date + "T23:59:59") }
 
   const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : ""
 
+  // Rejection filter uses attempted_at + ride_id + operator_id fields
+  let rejConditions = []
+  let rejParams = []
+  let rIdx = 1
+  if (ride_id && ride_id !== '') { rejConditions.push(`dr.ride_id = $${rIdx++}`); rejParams.push(parseInt(ride_id)) }
+  if (employee_id && employee_id !== '') { rejConditions.push(`dr.operator_id = $${rIdx++}`); rejParams.push(parseInt(employee_id)) }
+  if (start_date && start_date !== '') { rejConditions.push(`dr.attempted_at >= $${rIdx++}`); rejParams.push(start_date) }
+  if (end_date && end_date !== '') { rejConditions.push(`dr.attempted_at <= $${rIdx++}`); rejParams.push(end_date + "T23:59:59") }
+  const rejWhere = rejConditions.length > 0 ? "WHERE " + rejConditions.join(" AND ") : ""
+
   try {
-    // Detail rows — 3-table JOIN: employees + maintenance_requests + rides
-    // NEW: labor_cost (hours × hourly_rate), elapsed_hours for in-progress tasks
+    // Detail rows — 4-table JOIN: ride_dispatches + rides + employees + operator_assignments
     const { rows: details } = await pool.query(`
       SELECT
-        e.employee_id,
-        e.full_name AS employee_name,
-        e.email AS employee_email,
-        e.role AS employee_role,
-        e.hourly_rate,
-        r.ride_id,
+        d.dispatch_id,
+        d.dispatched_at,
         r.ride_name,
         r.location AS ride_zone,
-        m.request_id,
-        m.description AS task_description,
-        m.priority,
-        m.status,
-        m.created_at AS assigned_date,
-        m.completed_at,
-        CASE
-          WHEN m.completed_at IS NOT NULL
-          THEN ROUND(EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600, 1)
-          ELSE NULL
-        END AS hours_to_complete,
-        CASE
-          WHEN m.status = 'In Progress'
-          THEN ROUND(EXTRACT(EPOCH FROM (NOW() - m.created_at)) / 3600, 1)
-          ELSE NULL
-        END AS elapsed_hours,
-        CASE
-          WHEN m.completed_at IS NOT NULL AND e.hourly_rate IS NOT NULL
-          THEN ROUND((EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 * e.hourly_rate)::numeric, 2)
-          ELSE NULL
-        END AS labor_cost
-      FROM employees e
-      JOIN maintenance_requests m ON m.employee_id = e.employee_id
-      JOIN rides r ON r.ride_id = m.ride_id
+        e.full_name AS operator_name,
+        e.role AS operator_role,
+        d.guest_count,
+        d.cycle_duration_s,
+        ROUND((d.cycle_duration_s / 60.0)::numeric, 2) AS cycle_duration_min,
+        d.dispatch_notes,
+        oa.started_at AS shift_started,
+        oa.ended_at AS shift_ended
+      FROM ride_dispatches d
+      JOIN rides r ON r.ride_id = d.ride_id
+      JOIN employees e ON e.employee_id = d.operator_id
+      LEFT JOIN LATERAL (
+        SELECT oa2.started_at, oa2.ended_at
+        FROM operator_assignments oa2
+        WHERE oa2.employee_id = d.operator_id
+          AND oa2.ride_id = d.ride_id
+          AND oa2.started_at <= d.dispatched_at
+          AND (oa2.ended_at IS NULL OR oa2.ended_at >= d.dispatched_at)
+        ORDER BY oa2.started_at DESC
+        LIMIT 1
+      ) oa ON true
       ${where}
-      ORDER BY m.created_at DESC
+      ORDER BY d.dispatched_at DESC
     `, params)
 
-    // Summary per employee
-    // NEW: hourly_rate, total_labor_cost, total_hours, workload_vs_avg
+    // Summary per ride — throughput + rejection rate
     const { rows: summary } = await pool.query(`
       SELECT
-        e.employee_id,
-        e.full_name AS employee_name,
-        e.role AS employee_role,
-        e.hourly_rate,
-        COUNT(m.request_id) AS total_tasks,
-        COUNT(m.request_id) FILTER (WHERE m.status = 'Completed') AS completed_tasks,
-        COUNT(m.request_id) FILTER (WHERE m.status = 'In Progress') AS in_progress_tasks,
-        COUNT(m.request_id) FILTER (WHERE m.status = 'Pending') AS pending_tasks,
-        ROUND(100.0 * COUNT(m.request_id) FILTER (WHERE m.status = 'Completed') / NULLIF(COUNT(m.request_id), 0), 1) AS completion_rate,
-        ROUND(AVG(
-          CASE WHEN m.completed_at IS NOT NULL
-          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600
-          ELSE NULL END
-        )::numeric, 1) AS avg_hours_to_complete,
-        ROUND(SUM(
-          CASE WHEN m.completed_at IS NOT NULL
-          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600
-          ELSE NULL END
-        )::numeric, 1) AS total_hours_worked,
-        ROUND(SUM(
-          CASE WHEN m.completed_at IS NOT NULL AND e.hourly_rate IS NOT NULL
-          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 * e.hourly_rate
-          ELSE NULL END
-        )::numeric, 2) AS total_labor_cost,
-        COUNT(DISTINCT r.ride_id) AS rides_serviced,
-        ROUND(COUNT(m.request_id)::numeric / NULLIF(
-          (SELECT AVG(task_count) FROM (
-            SELECT COUNT(*) AS task_count FROM maintenance_requests WHERE employee_id IS NOT NULL GROUP BY employee_id
-          ) sub), 0), 2) AS workload_ratio
-      FROM employees e
-      JOIN maintenance_requests m ON m.employee_id = e.employee_id
-      JOIN rides r ON r.ride_id = m.ride_id
+        r.ride_name,
+        r.location AS ride_zone,
+        COUNT(d.dispatch_id) AS total_dispatches,
+        COALESCE(SUM(d.guest_count), 0) AS total_guests_served,
+        ROUND(AVG(d.guest_count)::numeric, 2) AS avg_guests_per_dispatch,
+        ROUND(AVG(d.cycle_duration_s)::numeric, 1) AS avg_cycle_seconds,
+        ROUND(MIN(d.cycle_duration_s)::numeric, 1) AS min_cycle_seconds,
+        ROUND(MAX(d.cycle_duration_s)::numeric, 1) AS max_cycle_seconds,
+        ROUND((SUM(d.cycle_duration_s) / 3600.0)::numeric, 2) AS total_operating_hours,
+        COUNT(DISTINCT d.operator_id) AS distinct_operators,
+        (SELECT COUNT(*) FROM dispatch_rejections dr WHERE dr.ride_id = r.ride_id
+          ${start_date ? `AND dr.attempted_at >= '${start_date}'` : ''}
+          ${end_date ? `AND dr.attempted_at <= '${end_date}T23:59:59'` : ''}
+        ) AS rejection_count,
+        ROUND(100.0 * (SELECT COUNT(*) FROM dispatch_rejections dr WHERE dr.ride_id = r.ride_id
+          ${start_date ? `AND dr.attempted_at >= '${start_date}'` : ''}
+          ${end_date ? `AND dr.attempted_at <= '${end_date}T23:59:59'` : ''}
+        )::numeric / NULLIF(COUNT(d.dispatch_id) + (SELECT COUNT(*) FROM dispatch_rejections dr WHERE dr.ride_id = r.ride_id
+          ${start_date ? `AND dr.attempted_at >= '${start_date}'` : ''}
+          ${end_date ? `AND dr.attempted_at <= '${end_date}T23:59:59'` : ''}
+        ), 0), 1) AS rejection_rate_pct
+      FROM ride_dispatches d
+      JOIN rides r ON r.ride_id = d.ride_id
       ${where}
-      GROUP BY e.employee_id, e.full_name, e.role, e.hourly_rate
-      ORDER BY total_tasks DESC
+      GROUP BY r.ride_id, r.ride_name, r.location
+      ORDER BY total_guests_served DESC
     `, params)
 
-    // Grand totals
+    // Summary per operator — who ran the most
+    const { rows: operatorSummary } = await pool.query(`
+      SELECT
+        e.full_name AS operator_name,
+        e.role AS operator_role,
+        COUNT(d.dispatch_id) AS dispatches_run,
+        COALESCE(SUM(d.guest_count), 0) AS total_guests_served,
+        ROUND(AVG(d.guest_count)::numeric, 2) AS avg_guests_per_dispatch,
+        ROUND((SUM(d.cycle_duration_s) / 3600.0)::numeric, 2) AS total_operating_hours,
+        COUNT(DISTINCT d.ride_id) AS distinct_rides_operated
+      FROM ride_dispatches d
+      JOIN employees e ON e.employee_id = d.operator_id
+      ${where}
+      GROUP BY e.employee_id, e.full_name, e.role
+      ORDER BY dispatches_run DESC
+    `, params)
+
+    // Grand totals + rejection totals
     const { rows: totals } = await pool.query(`
       SELECT
-        COUNT(DISTINCT e.employee_id) AS total_employees,
-        COUNT(m.request_id) AS total_tasks,
-        COUNT(m.request_id) FILTER (WHERE m.status = 'Completed') AS completed,
-        COUNT(m.request_id) FILTER (WHERE m.status = 'In Progress') AS in_progress,
-        COUNT(m.request_id) FILTER (WHERE m.status = 'Pending') AS pending,
-        ROUND(100.0 * COUNT(m.request_id) FILTER (WHERE m.status = 'Completed') / NULLIF(COUNT(m.request_id), 0), 1) AS completion_rate,
-        ROUND(AVG(
-          CASE WHEN m.completed_at IS NOT NULL
-          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600
-          ELSE NULL END
-        )::numeric, 1) AS avg_hours,
-        ROUND(SUM(
-          CASE WHEN m.completed_at IS NOT NULL
-          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600
-          ELSE NULL END
-        )::numeric, 1) AS total_hours_worked,
-        ROUND(SUM(
-          CASE WHEN m.completed_at IS NOT NULL AND e.hourly_rate IS NOT NULL
-          THEN EXTRACT(EPOCH FROM (m.completed_at - m.created_at)) / 3600 * e.hourly_rate
-          ELSE NULL END
-        )::numeric, 2) AS total_labor_cost,
-        COUNT(DISTINCT r.ride_id) AS rides_serviced
-      FROM employees e
-      JOIN maintenance_requests m ON m.employee_id = e.employee_id
-      JOIN rides r ON r.ride_id = m.ride_id
+        COUNT(d.dispatch_id) AS total_dispatches,
+        COALESCE(SUM(d.guest_count), 0) AS total_guests_served,
+        ROUND(AVG(d.guest_count)::numeric, 2) AS avg_guests_per_dispatch,
+        ROUND(AVG(d.cycle_duration_s)::numeric, 1) AS avg_cycle_seconds,
+        ROUND((SUM(d.cycle_duration_s) / 3600.0)::numeric, 2) AS total_operating_hours,
+        COUNT(DISTINCT d.operator_id) AS distinct_operators,
+        COUNT(DISTINCT d.ride_id) AS distinct_rides
+      FROM ride_dispatches d
       ${where}
     `, params)
 
+    const { rows: rejections } = await pool.query(`
+      SELECT
+        COUNT(*) AS total_rejections,
+        COUNT(DISTINCT rejection_code) AS distinct_codes
+      FROM dispatch_rejections dr
+      ${rejWhere}
+    `, rejParams)
+
+    const totalsCombined = {
+      ...totals[0],
+      total_rejections: rejections[0]?.total_rejections ?? 0,
+      rejection_rate_pct: totals[0].total_dispatches
+        ? Math.round(1000 * Number(rejections[0]?.total_rejections ?? 0) /
+          (Number(totals[0].total_dispatches) + Number(rejections[0]?.total_rejections ?? 0))) / 10
+        : 0
+    }
+
     if (format === 'csv') {
-      const csvHeaders = 'Employee,Role,Hourly Rate,Ride,Zone,Task,Priority,Status,Assigned Date,Completed At,Hours to Complete,Elapsed Hours,Labor Cost\n'
+      const csvHeaders = 'Dispatch ID,Dispatched At,Ride,Zone,Operator,Role,Guests,Cycle (s),Cycle (min),Notes\n'
       const csvRows = details.map(row =>
-        `"${row.employee_name}","${row.employee_role}",${row.hourly_rate || ''},"${row.ride_name}","${row.ride_zone}","${row.task_description}","${row.priority}","${row.status}",${new Date(row.assigned_date).toLocaleDateString()},${row.completed_at ? new Date(row.completed_at).toLocaleDateString() : ''},${row.hours_to_complete || ''},${row.elapsed_hours || ''},${row.labor_cost || ''}`
+        `${row.dispatch_id},${new Date(row.dispatched_at).toISOString()},"${row.ride_name}","${row.ride_zone}","${row.operator_name}","${row.operator_role}",${row.guest_count},${row.cycle_duration_s || ''},${row.cycle_duration_min || ''},"${(row.dispatch_notes || '').replace(/"/g, '""')}"`
       ).join('\n')
       res.setHeader('Content-Type', 'text/csv')
       res.send(csvHeaders + csvRows)
@@ -417,8 +432,9 @@ router.get("/employee-activity", async (req, res) => {
     res.json({
       details,
       summary,
-      totals: totals[0],
-      tables_used: ["employees", "maintenance_requests", "rides"]
+      operatorSummary,
+      totals: totalsCombined,
+      tables_used: ["ride_dispatches", "rides", "employees", "operator_assignments", "dispatch_rejections"]
     })
   } catch (err) {
     console.log("DB error:", err.message)
