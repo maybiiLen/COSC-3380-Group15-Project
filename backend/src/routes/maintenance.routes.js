@@ -22,6 +22,7 @@ router.get("/", async (req, res) => {
       FROM maintenance_requests m
       JOIN rides r       ON r.ride_id = m.ride_id
       LEFT JOIN employees e ON e.employee_id = m.employee_id
+      WHERE m.archived_at IS NULL
       ORDER BY m.created_at DESC
     `)
     res.json(rows)
@@ -52,6 +53,7 @@ router.get("/ride/:rideId", async (req, res) => {
       FROM maintenance_requests m
       LEFT JOIN employees e ON e.employee_id = m.employee_id
       WHERE m.ride_id = $1
+        AND m.archived_at IS NULL
       ORDER BY m.created_at DESC
     `, [rideId])
     res.json(rows)
@@ -141,21 +143,39 @@ router.put("/:id", async (req, res) => {
   }
 })
 
-// ─── DELETE a maintenance request ───
+// ─── DELETE (archive) a maintenance request ───
+// Soft-delete: only Completed requests can be archived.
+// The row stays in the table so reports and audit trails still see it,
+// but it's hidden from the admin list and per-ride views.
 router.delete("/:id", async (req, res) => {
   const { id } = req.params
 
   try {
-    const { rows } = await pool.query(
-      "DELETE FROM maintenance_requests WHERE request_id = $1 RETURNING *",
+    const { rows: existing } = await pool.query(
+      "SELECT status, archived_at FROM maintenance_requests WHERE request_id = $1",
       [id]
     )
 
-    if (rows.length === 0) {
+    if (existing.length === 0) {
       return res.status(404).json({ message: "Maintenance request not found" })
     }
 
-    res.json({ message: "Maintenance request deleted" })
+    if (existing[0].archived_at) {
+      return res.status(409).json({ message: "Maintenance request is already archived" })
+    }
+
+    if (String(existing[0].status).toLowerCase() !== "completed") {
+      return res.status(400).json({
+        message: "Only Completed maintenance requests can be deleted. Mark it Completed first."
+      })
+    }
+
+    await pool.query(
+      "UPDATE maintenance_requests SET archived_at = NOW() WHERE request_id = $1",
+      [id]
+    )
+
+    res.json({ message: "Maintenance request archived (hidden from list, preserved for reports)" })
   } catch (err) {
     console.log("DB error:", err.message)
     res.status(500).json({ message: err.message })

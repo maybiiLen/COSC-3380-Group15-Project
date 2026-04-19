@@ -1369,6 +1369,25 @@ const migrations = [
       $$ LANGUAGE plpgsql;
     `,
   },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION 15: SOFT-DELETE FOR MAINTENANCE REQUESTS
+  // ═══════════════════════════════════════════════════════════════
+  // Adds archived_at so completed maintenance requests can be hidden
+  // from the admin/ride views without losing historical data. Reports
+  // still read every row (including archived) so analytics stay
+  // accurate. Admin list views filter WHERE archived_at IS NULL.
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: "029_maintenance_archived_at",
+    sql: `
+      ALTER TABLE maintenance_requests
+        ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+
+      CREATE INDEX IF NOT EXISTS idx_maint_requests_archived_at
+        ON maintenance_requests (archived_at);
+    `,
+  },
 ];
 
 const run = async () => {
