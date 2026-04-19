@@ -412,6 +412,18 @@ function ParkClosuresSection() {
     } catch (err) { console.error(err) }
   }
 
+  async function handleArchive(id) {
+    if (!confirm("Archive this closure? It will disappear from the list but stay in reports.")) return
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/park-ops/park-closures/${id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.message || "Failed to archive closure")
+      }
+      fetchClosures()
+    } catch (err) { console.error(err) }
+  }
+
   return (
     <div className="mt-10">
       <div className="flex justify-between items-center mb-4">
@@ -499,10 +511,16 @@ function ParkClosuresSection() {
                 <td className="px-4 py-3 text-gray-500 text-xs">{new Date(c.started_at).toLocaleString()}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{c.ended_at ? new Date(c.ended_at).toLocaleString() : "—"}</td>
                 <td className="px-4 py-3">
-                  {c.is_active && (
+                  {c.is_active ? (
                     <button onClick={() => handleLift(c.closure_id)}
                       className="text-green-600 hover:text-green-800 text-xs font-medium cursor-pointer">
                       Lift Closure
+                    </button>
+                  ) : (
+                    <button onClick={() => handleArchive(c.closure_id)}
+                      title="Archive this resolved closure (kept for reports)"
+                      className="text-red-500 hover:text-red-700 text-xs font-medium cursor-pointer">
+                      Archive
                     </button>
                   )}
                 </td>

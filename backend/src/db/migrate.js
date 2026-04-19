@@ -1388,6 +1388,141 @@ const migrations = [
         ON maintenance_requests (archived_at);
     `,
   },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION 16: PARK-CLOSURE NOTIFICATIONS + SOFT-DELETE
+  // ═══════════════════════════════════════════════════════════════
+  // (1) Adds archived_at to park_closures so resolved closures can be
+  //     hidden from the admin list without losing the audit trail
+  //     (the reports endpoint still reads every row).
+  // (2) Extends fn_park_closure_cascade to emit notifications when a
+  //     zone is closed and when a closure is lifted. The existing
+  //     ride-status cascade behaviour is preserved.
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: "030_park_closure_notifications_and_archive",
+    sql: `
+      ALTER TABLE park_closures
+        ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+
+      CREATE INDEX IF NOT EXISTS idx_park_closures_archived_at
+        ON park_closures (archived_at);
+
+      CREATE OR REPLACE FUNCTION fn_park_closure_cascade()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_r                RECORD;
+        v_other_active     INTEGER;
+        v_affected_rides   INTEGER;
+        v_reopened_count   INTEGER;
+        v_on_call_manager  RECORD;
+      BEGIN
+        -- Find on-call manager (same pattern as maintenance routing)
+        SELECT employee_id, full_name, user_id
+          INTO v_on_call_manager
+          FROM employees
+         WHERE role = 'manager' AND is_active = true
+         ORDER BY employee_id
+         LIMIT 1;
+
+        -- NEW ACTIVE CLOSURE: cascade-close Operational rides in the zone.
+        IF TG_OP = 'INSERT' AND NEW.is_active = true THEN
+          UPDATE rides
+             SET status = 'Closed'
+           WHERE location = NEW.zone
+             AND status = 'Operational'
+             AND is_operational = true;
+
+          GET DIAGNOSTICS v_affected_rides = ROW_COUNT;
+
+          -- Manager notification (targeted)
+          PERFORM fn_create_notification(
+            'manager', v_on_call_manager.user_id, 'zone_closure_opened',
+            format('Zone Closure: %s', NEW.zone),
+            format('%s closed (%s). %s ride(s) auto-closed. Reason: %s',
+                   NEW.zone, NEW.closure_type, v_affected_rides, COALESCE(NEW.reason, 'No reason provided')),
+            'park_closures', NEW.closure_id
+          );
+
+          -- Staff broadcast
+          PERFORM fn_create_notification(
+            'staff', NULL, 'zone_closure_opened',
+            format('%s is now closed', NEW.zone),
+            format('%s has been closed (%s). Reason: %s. Affected rides: %s.',
+                   NEW.zone, NEW.closure_type, COALESCE(NEW.reason, 'No reason provided'), v_affected_rides),
+            'park_closures', NEW.closure_id
+          );
+        END IF;
+
+        -- CLOSURE DEACTIVATED: try to reopen rides if no other active
+        -- closure still covers the zone.
+        IF TG_OP = 'UPDATE' AND OLD.is_active = true AND NEW.is_active = false THEN
+          SELECT COUNT(*) INTO v_other_active
+            FROM park_closures
+           WHERE zone = NEW.zone
+             AND is_active = true
+             AND closure_id <> NEW.closure_id;
+
+          v_reopened_count := 0;
+
+          IF v_other_active = 0 THEN
+            FOR v_r IN
+              SELECT ride_id FROM rides
+               WHERE location = NEW.zone
+                 AND status = 'Closed'
+                 AND is_operational = true
+            LOOP
+              BEGIN
+                UPDATE rides SET status = 'Operational' WHERE ride_id = v_r.ride_id;
+                v_reopened_count := v_reopened_count + 1;
+              EXCEPTION WHEN OTHERS THEN
+                -- trg_guard_ride_reopen rejected this ride (e.g. pending
+                -- Critical/High maintenance). Leave it Closed and continue.
+                NULL;
+              END;
+            END LOOP;
+          END IF;
+
+          -- Manager notification (targeted)
+          PERFORM fn_create_notification(
+            'manager', v_on_call_manager.user_id, 'zone_closure_lifted',
+            format('Zone Reopened: %s', NEW.zone),
+            CASE
+              WHEN v_other_active > 0 THEN
+                format('Closure #%s on %s lifted, but %s other active closure(s) remain — no rides reopened.',
+                       NEW.closure_id, NEW.zone, v_other_active)
+              ELSE
+                format('Closure #%s on %s lifted. %s ride(s) reopened automatically.',
+                       NEW.closure_id, NEW.zone, v_reopened_count)
+            END,
+            'park_closures', NEW.closure_id
+          );
+
+          -- Staff broadcast
+          PERFORM fn_create_notification(
+            'staff', NULL, 'zone_closure_lifted',
+            format('%s is back open', NEW.zone),
+            CASE
+              WHEN v_other_active > 0 THEN
+                format('One closure on %s lifted, but other closures still active.', NEW.zone)
+              ELSE
+                format('%s is reopened. %s ride(s) returned to operation.', NEW.zone, v_reopened_count)
+            END,
+            'park_closures', NEW.closure_id
+          );
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS trg_park_closure_cascade ON park_closures;
+      CREATE TRIGGER trg_park_closure_cascade
+      AFTER INSERT OR UPDATE ON park_closures
+      FOR EACH ROW
+      EXECUTE FUNCTION fn_park_closure_cascade();
+    `,
+  },
 ];
 
 const run = async () => {

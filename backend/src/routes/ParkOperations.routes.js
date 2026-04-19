@@ -366,7 +366,9 @@ router.post("/merch/purchase", async (req, res) => {
 // ═══════════════════════════════════════════
 router.get("/park-closures", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM park_closures ORDER BY started_at DESC")
+    const { rows } = await pool.query(
+      "SELECT * FROM park_closures WHERE archived_at IS NULL ORDER BY started_at DESC"
+    )
     res.json(rows)
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
@@ -401,6 +403,37 @@ router.patch("/park-closures/:id/deactivate", async (req, res) => {
     res.json(rows[0])
   } catch (err) {
     console.log("Deactivate error:", err.message)
+    res.status(500).json({ message: err.message })
+  }
+})
+
+// DELETE (archive) a closure. Soft-delete: row stays in the table for reports,
+// but disappears from the admin list. Only resolved (is_active=false) closures
+// can be archived — you can't hide an active emergency.
+router.delete("/park-closures/:id", async (req, res) => {
+  try {
+    const { rows: existing } = await pool.query(
+      "SELECT is_active, archived_at FROM park_closures WHERE closure_id = $1",
+      [req.params.id]
+    )
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Closure not found" })
+    }
+    if (existing[0].archived_at) {
+      return res.status(409).json({ message: "Closure is already archived" })
+    }
+    if (existing[0].is_active) {
+      return res.status(400).json({
+        message: "Lift the closure before archiving. Active closures can't be hidden."
+      })
+    }
+    await pool.query(
+      "UPDATE park_closures SET archived_at = NOW() WHERE closure_id = $1",
+      [req.params.id]
+    )
+    res.json({ message: "Closure archived (hidden from list, preserved for reports)" })
+  } catch (err) {
+    console.log("Archive error:", err.message)
     res.status(500).json({ message: err.message })
   }
 })
