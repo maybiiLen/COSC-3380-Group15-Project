@@ -7,16 +7,16 @@ import DiningPage from "./pages/DiningPage";
 import GamesPage from "./pages/GamesPage";
 import ShoppingPage from "./pages/ShoppingPage";
 import CustomerRidesPage from "./pages/CustomerRidesPage";
+import MyPurchases from "./pages/MyPurchases";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 
-import Home from "./pages/Home";
 import Rides from "./pages/Rides";
 import Staff from "./pages/Staff";
-import Tickets from "./pages/Tickets";
 import ParkOperations from "./pages/ParkOperations";
 import Maintenance from "./pages/Maintenance";
 import Analytics from "./pages/Analytics";
+import Notifications from "./pages/Notifications";
 
 function DashboardLayout() {
   return (
@@ -24,13 +24,13 @@ function DashboardLayout() {
       <Sidebar />
       <main className="flex-1 p-8 overflow-auto">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Navigate to="/dashboard/rides" replace />} />
           <Route path="/rides" element={<Rides />} />
           <Route path="/staff" element={<Staff />} />
-          <Route path="/tickets" element={<Tickets />} />
           <Route path="/dining-shops" element={<ParkOperations />} />
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/notifications" element={<Notifications />} />
         </Routes>
       </main>
     </div>
@@ -48,6 +48,7 @@ export default function App() {
           <Route path="/games" element={<GamesPage />} />
           <Route path="/shopping" element={<ShoppingPage />} />
           <Route path="/rides" element={<CustomerRidesPage />} />
+          <Route path="/my-purchases" element={<MyPurchases />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/login" element={<Navigate to="/auth" replace />} />
           <Route path="/register" element={<Navigate to="/auth" replace />} />

@@ -184,7 +184,7 @@ export default function Staff() {
                 color: "rgba(255,255,255,0.6)",
                 margin: 0
               }}>
-                {isAdmin ? "👥 View and manage employee accounts" : "👀 View current staff members"}
+                {isAdmin ? "View and manage employee accounts" : "View current staff members"}
               </p>
             </div>
           </div>
@@ -233,7 +233,7 @@ export default function Staff() {
             fontSize: "0.85rem",
             color: "#81C784"
           }}>
-            ✅ {success}
+            {success}
           </div>
         )}
         {error && (
@@ -260,9 +260,9 @@ export default function Staff() {
           marginBottom: "2rem"
         }}>
           {[
-            { label: "Total Staff", value: employees.length, icon: "👥", color: "#C8102E" },
-            { label: "Managers", value: employees.filter(e => e.role === "manager").length, icon: "👨‍💼", color: "#8C1D40" },
-            { label: "Staff Members", value: employees.filter(e => e.role === "staff").length, icon: "👷‍♀️", color: "#F4845F" }
+            { label: "Total Staff", value: employees.length, color: "#C8102E" },
+            { label: "Managers", value: employees.filter(e => e.role === "manager").length, color: "#8C1D40" },
+            { label: "Staff Members", value: employees.filter(e => e.role === "staff").length, color: "#F4845F" }
           ].map((card, i) => (
             <div key={i} style={{
               background: "#1A1919",
@@ -277,15 +277,11 @@ export default function Staff() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
                 <div style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "10px",
-                  background: `linear-gradient(135deg, ${card.color}20, ${card.color}10)`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "1.2rem"
-                }}>{card.icon}</div>
+                  width: "6px",
+                  height: "28px",
+                  borderRadius: "3px",
+                  background: card.color,
+                }} />
                 <p style={{
                   fontFamily: f,
                   fontSize: "0.8rem",
@@ -755,7 +751,7 @@ export default function Staff() {
               alignItems: "center",
               gap: "0.5rem"
             }}>
-              👥 Staff Directory
+              Staff Directory
             </h3>
           </div>
 
@@ -804,7 +800,7 @@ export default function Staff() {
                       fontFamily: f,
                       color: "rgba(255,255,255,0.5)"
                     }}>
-                      👤 No employees found
+                      No employees found
                     </td>
                   </tr>
                 )}
@@ -895,7 +891,7 @@ export default function Staff() {
               color: "rgba(255,255,255,0.6)",
               margin: 0
             }}>
-              🔒 Only administrators can create or modify employee accounts
+              Only administrators can create or modify employee accounts
             </p>
           </div>
         )}

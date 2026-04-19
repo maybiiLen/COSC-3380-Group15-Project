@@ -60,4 +60,36 @@ router.patch("/read-all", verifyToken, async (req, res) => {
   }
 })
 
+// ─── DELETE a single notification (only if addressed to this user) ───
+router.delete("/:id", verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM notifications
+       WHERE notification_id = $1
+         AND (recipient_role = $2 OR recipient_user_id = $3 OR recipient_role = 'all')`,
+      [req.params.id, req.user.role, req.user.id]
+    )
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Notification not found" })
+    }
+    res.json({ message: "Notification deleted" })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+})
+
+// ─── DELETE all notifications for this user (clear inbox) ───
+router.delete("/", verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM notifications
+       WHERE (recipient_role = $1 OR recipient_user_id = $2 OR recipient_role = 'all')`,
+      [req.user.role, req.user.id]
+    )
+    res.json({ message: "Inbox cleared", deleted: result.rowCount })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+})
+
 module.exports = router

@@ -1,11 +1,30 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { API_BASE_URL } from '../utils/api'
+import {
+  ResponsiveContainer,
+  LineChart, Line,
+  BarChart, Bar,
+  PieChart, Pie, Cell,
+  CartesianGrid, XAxis, YAxis, Tooltip, Legend,
+} from 'recharts'
+
+// Chart palette — red family + complementary tones for categorical series
+const CHART_COLORS = ['#C8102E', '#8C1D40', '#F59E0B', '#10B981', '#3B82F6', '#A855F7', '#EC4899']
+const AXIS_COLOR = '#6B7280'
+const GRID_COLOR = '#E5E7EB'
+const TOOLTIP_STYLE = {
+  background: '#FFFFFF',
+  border: '1px solid #E5E7EB',
+  borderRadius: 8,
+  fontSize: 12,
+  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
+}
 
 const REPORTS = [
-  { id: 'maintenance', label: 'Maintenance Report', desc: 'Maintenance requests by ride, employee, closures, and alerts', tables: ['maintenance_requests', 'rides', 'employees', 'park_closures', 'notifications'] },
-  { id: 'ticketSales', label: 'Ticket Sales Report', desc: 'Ticket purchases, revenue, and customer data', tables: ['ticket_purchases', 'customers', 'ticket_types'] },
-  { id: 'rideOperations', label: 'Ride Operations Report', desc: 'Ride dispatches, guest throughput, operator performance, and rejection rates', tables: ['ride_dispatches', 'rides', 'employees', 'operator_assignments', 'dispatch_rejections'] },
+  { id: 'maintenance', label: 'Maintenance Report', desc: 'Maintenance requests by ride, employee, closures, and alerts' },
+  { id: 'ticketSales', label: 'Ticket Sales Report', desc: 'Ticket purchases, revenue, and customer data' },
+  { id: 'rideOperations', label: 'Ride Operations Report', desc: 'Ride dispatches, guest throughput, operator performance, and rejection rates' },
 ]
 
 export default function Analytics() {
@@ -20,7 +39,7 @@ export default function Analytics() {
 
   const [filters, setFilters] = useState({
     ride_id: '', employee_id: '', status: '', priority: '',
-    ticket_type: '', customer_name: '', start_date: '', end_date: '',
+    ticket_type: '', customer_email: '', start_date: '', end_date: '',
   })
 
   useEffect(() => {
@@ -30,7 +49,7 @@ export default function Analytics() {
   }, [])
 
   function resetFilters() {
-    setFilters({ ride_id: '', employee_id: '', status: '', priority: '', ticket_type: '', customer_name: '', start_date: '', end_date: '' })
+    setFilters({ ride_id: '', employee_id: '', status: '', priority: '', ticket_type: '', customer_email: '', start_date: '', end_date: '' })
     setShowResults(false)
     setReportData(null)
       }
@@ -93,7 +112,7 @@ export default function Analytics() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Report Request</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
       <p className="mt-1 text-sm text-gray-500">Select a report, set your filters, and click View Report</p>
 
       {/* Report Selection */}
@@ -107,7 +126,6 @@ export default function Analytics() {
             }`}>
             <p className={`text-sm font-bold ${selectedReport === r.id ? 'text-[#C8102E]' : 'text-gray-900'}`}>{r.label}</p>
             <p className="text-xs text-gray-500 mt-1">{r.desc}</p>
-            <p className="text-xs text-gray-400 mt-2">Tables: {r.tables.join(', ')}</p>
           </button>
         ))}
       </div>
@@ -185,12 +203,12 @@ export default function Analytics() {
               </div>
             )}
 
-            {/* Customer name filter — ticketSales */}
+            {/* Customer email filter — ticketSales */}
             {selectedReport === 'ticketSales' && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Customer Name</label>
-                <input type="text" placeholder="Search by name..." value={filters.customer_name}
-                  onChange={e => setFilters({...filters, customer_name: e.target.value})}
+                <label className="block text-xs font-medium text-gray-500 mb-1">Customer Email</label>
+                <input type="text" placeholder="Search by email..." value={filters.customer_email}
+                  onChange={e => setFilters({...filters, customer_email: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#C8102E]" />
               </div>
             )}
@@ -217,7 +235,7 @@ export default function Analytics() {
             {showResults && (
               <button onClick={saveAsCSV}
                 className="px-6 py-2.5 text-sm font-semibold bg-gray-800 text-white rounded-lg hover:bg-gray-700 cursor-pointer flex items-center gap-1">
-                💾 Save As CSV
+                Save As CSV
               </button>
             )}
             <button onClick={resetFilters}
@@ -234,17 +252,10 @@ export default function Analytics() {
       {showResults && reportData && (
         <div className="mt-6 space-y-6">
 
-          {/* Tables Used Badge */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-medium text-gray-500">Tables used:</span>
-            {(reportData.tables_used || reportInfo?.tables || []).map(t => (
-              <span key={t} className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{t}</span>
-            ))}
-          </div>
-
           {/* ─── Maintenance Report Results ─── */}
           {selectedReport === 'maintenance' && (
             <>
+              <MaintenanceCharts data={reportData} />
               <ReportTable title="Maintenance Summary by Ride" columns={['Ride', 'Total', 'Pending', 'In Progress', 'Completed', 'Completion %', 'Avg Hours', 'Min Hours', 'Max Hours', 'Total Downtime', 'Employees', 'Closure Related', 'Alerts']}
                 rows={reportData.summary?.map(r => [r.ride_name, r.total_requests, r.pending, r.in_progress, r.completed, `${r.completion_rate_pct}%`, r.avg_hours_to_complete ?? '—', r.min_hours ?? '—', r.max_hours ?? '—', `${r.total_downtime_hours ?? '—'}h`, r.distinct_employees, r.closure_related, r.total_alerts])}
                 totals={reportData.totals ? ['TOTAL', reportData.totals.total_requests, reportData.totals.pending, reportData.totals.in_progress, reportData.totals.completed, `${reportData.totals.completion_rate_pct}%`, reportData.totals.avg_hours_to_complete ?? '—', reportData.totals.min_hours ?? '—', reportData.totals.max_hours ?? '—', `${reportData.totals.total_downtime_hours ?? '—'}h`, reportData.totals.distinct_employees, reportData.totals.closure_related, reportData.totals.total_alerts] : null} />
@@ -256,17 +267,19 @@ export default function Analytics() {
           {/* ─── Ticket Sales Report Results ─── */}
           {selectedReport === 'ticketSales' && (
             <>
+              <TicketSalesCharts data={reportData} />
               <ReportTable title="Sales by Ticket Type" columns={['Type', 'Category', 'Fast Pass', 'Price', 'Sold', 'Revenue', 'Revenue %', 'Customers', 'Orders', 'Avg Order']}
                 rows={reportData.byType?.map(r => [r.ticket_type, r.ticket_category || '—', r.fast_pass ? 'Yes' : 'No', `$${Number(r.price).toFixed(2)}`, r.tickets_sold, `$${Number(r.subtotal_revenue).toLocaleString()}`, `${r.revenue_share_pct}%`, r.distinct_customers, r.total_transactions, `$${Number(r.avg_transaction).toFixed(2)}`])}
                 totals={reportData.totals ? ['TOTAL', '', '', '', reportData.totals.total_tickets, `$${Number(reportData.totals.total_revenue || 0).toLocaleString()}`, `${reportData.totals.revenue_share_pct}%`, reportData.totals.distinct_customers, reportData.totals.total_transactions, `$${Number(reportData.totals.avg_price || 0).toFixed(2)}`] : null} />
               <ReportTable title="Transaction Details" columns={['ID', 'Customer', 'Email', 'Phone', 'Type', 'Category', 'Fast Pass', 'Adults', 'Children', 'Adult Price', 'Child Price', 'Total', 'Visit Date', 'Purchased']}
-                rows={reportData.details?.map(r => [`#${r.purchase_id}`, r.customer_name, r.customer_email || '—', r.customer_phone || '—', r.ticket_type, r.ticket_category || '—', r.fast_pass ? 'Yes' : 'No', r.adult_qty, r.child_qty, `$${Number(r.unit_price_adult).toFixed(2)}`, `$${Number(r.unit_price_child).toFixed(2)}`, `$${Number(r.total_price).toFixed(2)}`, r.visit_date || '—', new Date(r.purchase_date).toLocaleDateString()])} />
+                rows={reportData.details?.map(r => [`#${r.purchase_id}`, r.customer_name, r.customer_email || '—', r.customer_phone || '—', r.ticket_type, r.ticket_category || '—', r.fast_pass ? 'Yes' : 'No', r.adult_qty, r.child_qty, `$${Number(r.unit_price_adult).toFixed(2)}`, `$${Number(r.unit_price_child).toFixed(2)}`, `$${Number(r.total_price).toFixed(2)}`, r.visit_date ? new Date(r.visit_date).toLocaleDateString() : '—', new Date(r.purchase_date).toLocaleDateString()])} />
             </>
           )}
 
           {/* ─── Ride Operations Report Results ─── */}
           {selectedReport === 'rideOperations' && (
             <>
+              <RideOperationsCharts data={reportData} />
               <ReportTable title="Throughput by Ride" columns={['Ride', 'Zone', 'Dispatches', 'Guests Served', 'Avg Guests/Run', 'Avg Cycle (s)', 'Min Cycle', 'Max Cycle', 'Operating Hrs', 'Operators', 'Rejections', 'Rejection %']}
                 rows={reportData.summary?.map(r => [r.ride_name, r.ride_zone, r.total_dispatches, r.total_guests_served, r.avg_guests_per_dispatch ?? '—', r.avg_cycle_seconds ?? '—', r.min_cycle_seconds ?? '—', r.max_cycle_seconds ?? '—', `${r.total_operating_hours ?? '—'}h`, r.distinct_operators, r.rejection_count, `${r.rejection_rate_pct ?? 0}%`])}
                 totals={reportData.totals ? ['TOTAL', `${reportData.totals.distinct_rides} rides`, reportData.totals.total_dispatches, reportData.totals.total_guests_served, reportData.totals.avg_guests_per_dispatch ?? '—', reportData.totals.avg_cycle_seconds ?? '—', '', '', `${reportData.totals.total_operating_hours ?? '—'}h`, reportData.totals.distinct_operators, reportData.totals.total_rejections, `${reportData.totals.rejection_rate_pct ?? 0}%`] : null} />
@@ -317,6 +330,293 @@ function ReportTable({ title, columns, rows, totals }) {
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Chart Card wrapper ───────────────────────────────
+function ChartCard({ title, children, height = 280 }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-bold text-gray-900 mb-3">{title}</h3>
+      <div style={{ width: '100%', height }}>{children}</div>
+    </div>
+  )
+}
+
+function ChartEmpty() {
+  return <div className="h-full flex items-center justify-center text-xs text-gray-400">No data for this chart yet.</div>
+}
+
+// ─── Maintenance Charts ───────────────────────────────
+function MaintenanceCharts({ data }) {
+  const byRide = useMemo(() => {
+    return (data.summary || []).map(r => ({ name: r.ride_name, value: Number(r.total_requests || 0) }))
+  }, [data])
+
+  const priorityStatus = useMemo(() => {
+    const priorities = ['Critical', 'High', 'Medium', 'Low']
+    return priorities.map(p => {
+      const subset = (data.details || []).filter(d => d.priority === p)
+      return {
+        name: p,
+        Pending: subset.filter(d => d.status === 'Pending').length,
+        'In Progress': subset.filter(d => d.status === 'In Progress').length,
+        Completed: subset.filter(d => d.status === 'Completed').length,
+      }
+    })
+  }, [data])
+
+  const overTime = useMemo(() => {
+    const byDay = new Map()
+    ;(data.details || []).forEach(d => {
+      const k = (d.request_date || '').slice(0, 10)
+      if (!k) return
+      byDay.set(k, (byDay.get(k) || 0) + 1)
+    })
+    return [...byDay.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .slice(-30)
+      .map(([date, count]) => ({ date: date.slice(5), count }))
+  }, [data])
+
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-gray-900 mb-3">Charts</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <ChartCard title="Maintenance by Ride">
+          {byRide.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={byRide} margin={{ top: 8, right: 8, left: 0, bottom: 40 }}>
+                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: AXIS_COLOR, fontSize: 11 }} interval={0} angle={-25} textAnchor="end" height={70} />
+                <YAxis tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        <ChartCard title="By Priority × Status">
+          {priorityStatus.every(r => r.Pending + r['In Progress'] + r.Completed === 0) ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={priorityStatus} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <YAxis tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#4B5563' }} />
+                <Bar dataKey="Pending" stackId="a" fill={CHART_COLORS[0]} />
+                <Bar dataKey="In Progress" stackId="a" fill={CHART_COLORS[2]} />
+                <Bar dataKey="Completed" stackId="a" fill={CHART_COLORS[3]} radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="mb-6">
+        <ChartCard title="Maintenance Over Time (last 30 days)" height={240}>
+          {overTime.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={overTime} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <YAxis tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Line type="monotone" dataKey="count" name="Requests" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: CHART_COLORS[0] }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </div>
+    </div>
+  )
+}
+
+// ─── Ticket Sales Charts ──────────────────────────────
+function TicketSalesCharts({ data }) {
+  const byType = useMemo(() => {
+    return (data.byType || []).map(r => ({ name: r.ticket_type, value: Number(r.tickets_sold || 0) }))
+  }, [data])
+
+  const topCustomers = useMemo(() => {
+    const m = new Map()
+    ;(data.details || []).forEach(d => {
+      const name = d.customer_name || 'Unknown'
+      m.set(name, (m.get(name) || 0) + Number(d.total_price || 0))
+    })
+    return [...m.entries()]
+      .map(([label, value]) => ({ label, value: Number(value.toFixed(2)) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [data])
+
+  const revenueOverTime = useMemo(() => {
+    const byDay = new Map()
+    ;(data.details || []).forEach(d => {
+      const k = (d.purchase_date || '').slice(0, 10)
+      if (!k) return
+      byDay.set(k, (byDay.get(k) || 0) + Number(d.total_price || 0))
+    })
+    return [...byDay.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .slice(-30)
+      .map(([date, revenue]) => ({ date: date.slice(5), revenue: Number(revenue.toFixed(2)) }))
+  }, [data])
+
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-gray-900 mb-3">Charts</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <ChartCard title="Tickets Sold by Type">
+          {byType.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#4B5563' }} verticalAlign="bottom" height={32} />
+                <Pie data={byType} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="82%" paddingAngle={2} stroke="#FFFFFF" strokeWidth={2}>
+                  {byType.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        <ChartCard title="Top 10 Customers by Spend">
+          {topCustomers.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topCustomers} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <YAxis type="category" dataKey="label" tick={{ fill: AXIS_COLOR, fontSize: 11 }} width={120} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="mb-6">
+        <ChartCard title="Revenue Over Time (last 30 days)" height={240}>
+          {revenueOverTime.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={revenueOverTime} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <YAxis tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Line type="monotone" dataKey="revenue" name="Revenue ($)" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: CHART_COLORS[0] }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </div>
+    </div>
+  )
+}
+
+// ─── Ride Operations Charts ───────────────────────────
+function RideOperationsCharts({ data }) {
+  // Dispatches per day — a line per top-5 rides by dispatch count
+  const dispatchSeries = useMemo(() => {
+    const rideCounts = new Map()
+    ;(data.details || []).forEach(d => {
+      rideCounts.set(d.ride_name, (rideCounts.get(d.ride_name) || 0) + 1)
+    })
+    const topRides = [...rideCounts.entries()].sort(([, a], [, b]) => b - a).slice(0, 5).map(([n]) => n)
+
+    const byDay = new Map()
+    ;(data.details || []).forEach(d => {
+      if (!topRides.includes(d.ride_name)) return
+      const k = (d.dispatched_at || '').slice(0, 10)
+      if (!k) return
+      if (!byDay.has(k)) byDay.set(k, { date: k.slice(5) })
+      const row = byDay.get(k)
+      row[d.ride_name] = (row[d.ride_name] || 0) + 1
+    })
+    return {
+      rows: [...byDay.values()].sort((a, b) => (a.date < b.date ? -1 : 1)),
+      rides: topRides,
+    }
+  }, [data])
+
+  // Rejections by ride (proxy for "by code" since detail data doesn't carry code)
+  const rejectionsByRide = useMemo(() => {
+    return (data.summary || [])
+      .filter(r => r.rejection_count > 0)
+      .map(r => ({ name: r.ride_name, value: Number(r.rejection_count || 0) }))
+  }, [data])
+
+  // Operator hours — horizontal bar
+  const operatorHours = useMemo(() => {
+    return (data.operatorSummary || [])
+      .map(r => ({ label: r.operator_name, value: Number(r.total_operating_hours || 0) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [data])
+
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-gray-900 mb-3">Charts</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <ChartCard title="Dispatches per Day (top 5 rides)">
+          {dispatchSeries.rows.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dispatchSeries.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <YAxis tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#4B5563' }} />
+                {dispatchSeries.rides.map((name, i) => (
+                  <Line
+                    key={name}
+                    type="monotone"
+                    dataKey={name}
+                    stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                    strokeWidth={2}
+                    dot={{ r: 2, strokeWidth: 0, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+                    activeDot={{ r: 4 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        <ChartCard title="Rejections by Ride">
+          {rejectionsByRide.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#4B5563' }} verticalAlign="bottom" height={32} />
+                <Pie data={rejectionsByRide} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="82%" paddingAngle={2} stroke="#FFFFFF" strokeWidth={2}>
+                  {rejectionsByRide.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="mb-6">
+        <ChartCard title="Operator Hours (top 10)">
+          {operatorHours.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={operatorHours} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <YAxis type="category" dataKey="label" tick={{ fill: AXIS_COLOR, fontSize: 11 }} width={120} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                <Bar dataKey="value" name="Operating Hours" fill={CHART_COLORS[0]} radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
       </div>
     </div>
   )

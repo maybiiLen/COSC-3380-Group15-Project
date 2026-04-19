@@ -205,6 +205,23 @@ export default function CustomerNav() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           {user ? (
             <>
+              <Link to="/my-purchases" style={{
+                fontFamily: f, fontSize: "0.73rem", fontWeight: 700,
+                color: "rgba(255,255,255,0.65)", padding: "7px 16px",
+                border: "1px solid rgba(255,255,255,0.12)", borderRadius: "50px",
+                display: "flex", alignItems: "center", gap: "6px",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--cr-red)"; e.currentTarget.style.color = "white" }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.color = "rgba(255,255,255,0.65)" }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                  <line x1="3" y1="6" x2="21" y2="6"/>
+                  <path d="M16 10a4 4 0 0 1-8 0"/>
+                </svg>
+                My Purchases
+              </Link>
               {["staff", "manager", "admin"].includes(user.role) && (
                 <Link to="/dashboard" style={{
                   fontFamily: f, fontSize: "0.73rem", fontWeight: 700,

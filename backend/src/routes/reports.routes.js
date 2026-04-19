@@ -179,7 +179,7 @@ router.get("/maintenance", async (req, res) => {
 
 // ─── REPORT 2: Ticket Sales (ticket_purchases + customers + ticket_types) ───
 router.get("/ticket-sales", async (req, res) => {
-  const { ticket_type, start_date, end_date, customer_name, format } = req.query
+  const { ticket_type, start_date, end_date, customer_email, format } = req.query
 
   let conditions = []
   let params = []
@@ -188,7 +188,12 @@ router.get("/ticket-sales", async (req, res) => {
   if (ticket_type && ticket_type !== '') { conditions.push(`tp.ticket_type = $${idx++}`); params.push(ticket_type) }
   if (start_date && start_date !== '') { conditions.push(`tp.purchase_date >= $${idx++}`); params.push(start_date) }
   if (end_date && end_date !== '') { conditions.push(`tp.purchase_date <= $${idx++}`); params.push(end_date + "T23:59:59") }
-  if (customer_name && customer_name !== '') { conditions.push(`LOWER(c.full_name) LIKE $${idx++}`); params.push(`%${customer_name.toLowerCase()}%`) }
+  if (customer_email && customer_email !== '') {
+    // Email lives either on tp.buyer_email (guest checkout) or c.email (registered).
+    conditions.push(`(LOWER(tp.buyer_email) LIKE $${idx} OR LOWER(c.email) LIKE $${idx})`)
+    params.push(`%${customer_email.toLowerCase()}%`)
+    idx++
+  }
 
   const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : ""
 
@@ -257,7 +262,7 @@ router.get("/ticket-sales", async (req, res) => {
     if (format === 'csv') {
       const csvHeaders = 'Purchase ID,Customer,Email,Phone,Type,Category,Fast Pass,Adults,Children,Adult Price,Child Price,Total,Visit Date,Purchased\n'
       const csvRows = details.map(row =>
-        `${row.purchase_id},"${row.customer_name}","${row.customer_email || ''}","${row.customer_phone || ''}","${row.ticket_type}","${row.ticket_category || ''}",${row.fast_pass || false},${row.adult_qty},${row.child_qty},${row.unit_price_adult},${row.unit_price_child},${row.total_price},${row.visit_date || ''},${new Date(row.purchase_date).toLocaleDateString()}`
+        `${row.purchase_id},"${row.customer_name}","${row.customer_email || ''}","${row.customer_phone || ''}","${row.ticket_type}","${row.ticket_category || ''}",${row.fast_pass || false},${row.adult_qty},${row.child_qty},${row.unit_price_adult},${row.unit_price_child},${row.total_price},${row.visit_date ? new Date(row.visit_date).toISOString().slice(0, 10) : ''},${new Date(row.purchase_date).toISOString().slice(0, 10)}`
       ).join('\n')
       res.setHeader('Content-Type', 'text/csv')
       res.send(csvHeaders + csvRows)

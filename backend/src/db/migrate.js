@@ -299,15 +299,6 @@ const migrations = [
         ended_at          TIMESTAMP
       );
 
-      CREATE TABLE IF NOT EXISTS ride_dispatch_queue (
-        queue_id           SERIAL PRIMARY KEY,
-        ride_id            INTEGER NOT NULL REFERENCES rides(ride_id),
-        customer_id        INTEGER NOT NULL REFERENCES customers(customer_id),
-        measured_height_in NUMERIC(4,1) NOT NULL,
-        accessibility_flag VARCHAR(50),
-        loaded_at          TIMESTAMP NOT NULL DEFAULT NOW()
-      );
-
       CREATE TABLE IF NOT EXISTS dispatch_rejections (
         rejection_id      SERIAL PRIMARY KEY,
         ride_id           INTEGER NOT NULL REFERENCES rides(ride_id),
@@ -385,9 +376,25 @@ const migrations = [
       RETURNS TRIGGER AS $$
       DECLARE
         v_open_blocking INTEGER;
+        v_zone_closed   INTEGER;
       BEGIN
         -- Only fire when the ride transitions back to Operational
         IF NEW.status = 'Operational' AND OLD.status IS DISTINCT FROM 'Operational' THEN
+
+          -- RULE 1: block reopen if the ride's zone has an active park closure
+          SELECT COUNT(*) INTO v_zone_closed
+            FROM park_closures
+           WHERE zone = NEW.location
+             AND is_active = true;
+
+          IF v_zone_closed > 0 THEN
+            RAISE EXCEPTION 'Cannot reopen ride % — zone % is currently closed',
+                            NEW.ride_name, NEW.location
+              USING ERRCODE = 'RR002',
+                    HINT    = 'Lift the zone closure before reopening rides in this zone';
+          END IF;
+
+          -- RULE 2: block reopen if unresolved Critical/High maintenance exists
           SELECT COUNT(*) INTO v_open_blocking
             FROM maintenance_requests
            WHERE ride_id = NEW.ride_id
@@ -684,7 +691,16 @@ const migrations = [
           END IF;
         END IF;
 
-        -- PHASE 4: BRANCH BY EVENT CLASS (dashboard notifications only)
+        -- PHASE 3b: AUTO-CLOSE the ride when an urgent maintenance request lands.
+        -- Only touches Operational rides — leaves Maintenance/Closed/Decommissioned alone.
+        IF v_event_class IN ('CRITICAL_ESCALATION', 'HIGH_ALERT', 'REPEATED_FAILURE') THEN
+          UPDATE rides
+             SET status = 'Closed'
+           WHERE ride_id = NEW.ride_id
+             AND status = 'Operational';
+        END IF;
+
+        -- PHASE 4: BRANCH BY EVENT CLASS (notifications + any remaining side effects)
 
         IF v_event_class = 'NEW_REQUEST' THEN
           -- MANAGER: full maintenance request details
@@ -891,6 +907,81 @@ const migrations = [
   },
 
   // ═══════════════════════════════════════════════════════════════
+  // SECTION 9b: TRIGGER — PARK CLOSURE CASCADE
+  // ═══════════════════════════════════════════════════════════════
+  // AFTER INSERT OR UPDATE on park_closures
+  //
+  // When a new closure becomes active, close every Operational ride in
+  // that zone. When a closure is deactivated and no other active closure
+  // covers the zone, reopen Closed rides — the guard trigger
+  // (trg_guard_ride_reopen) still enforces maintenance rules per ride,
+  // so rides with pending Critical/High work stay Closed.
+  //
+  // The per-ride BEGIN/EXCEPTION block catches guard rejections so one
+  // blocked ride doesn't abort the cascade for the rest.
+  //
+  // Tables read:    park_closures, rides
+  // Tables written: rides
+  // ═══════════════════════════════════════════════════════════════
+
+  {
+    name: "024_trigger_park_closure_cascade",
+    sql: `
+      CREATE OR REPLACE FUNCTION fn_park_closure_cascade()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_r            RECORD;
+        v_other_active INTEGER;
+      BEGIN
+        -- NEW ACTIVE CLOSURE: cascade-close Operational rides in the zone.
+        IF TG_OP = 'INSERT' AND NEW.is_active = true THEN
+          UPDATE rides
+             SET status = 'Closed'
+           WHERE location = NEW.zone
+             AND status = 'Operational'
+             AND is_operational = true;
+        END IF;
+
+        -- CLOSURE DEACTIVATED: try to reopen rides if no other active
+        -- closure still covers the zone.
+        IF TG_OP = 'UPDATE' AND OLD.is_active = true AND NEW.is_active = false THEN
+          SELECT COUNT(*) INTO v_other_active
+            FROM park_closures
+           WHERE zone = NEW.zone
+             AND is_active = true
+             AND closure_id <> NEW.closure_id;
+
+          IF v_other_active = 0 THEN
+            FOR v_r IN
+              SELECT ride_id FROM rides
+               WHERE location = NEW.zone
+                 AND status = 'Closed'
+                 AND is_operational = true
+            LOOP
+              BEGIN
+                UPDATE rides SET status = 'Operational' WHERE ride_id = v_r.ride_id;
+              EXCEPTION WHEN OTHERS THEN
+                -- trg_guard_ride_reopen rejected this ride (e.g. pending
+                -- Critical/High maintenance). Leave it Closed and continue.
+                NULL;
+              END;
+            END LOOP;
+          END IF;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS trg_park_closure_cascade ON park_closures;
+      CREATE TRIGGER trg_park_closure_cascade
+      AFTER INSERT OR UPDATE ON park_closures
+      FOR EACH ROW
+      EXECUTE FUNCTION fn_park_closure_cascade();
+    `,
+  },
+
+  // ═══════════════════════════════════════════════════════════════
   // SECTION 10: CLEANUP — DROP MONITOR/POLICY ARTIFACTS
   // ═══════════════════════════════════════════════════════════════
   // Removes tables and artifacts from the legacy event routing and
@@ -910,6 +1001,63 @@ const migrations = [
 
       DROP TRIGGER IF EXISTS trg_enforce_ticket_purchase_policy ON ticket_purchases;
       DROP FUNCTION IF EXISTS fn_enforce_ticket_purchase_policy() CASCADE;
+    `,
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION 11: MERCH ONLINE PURCHASES
+  // ═══════════════════════════════════════════════════════════════
+  // One row per online merch order. Items are stored as JSONB so we
+  // don't need a separate line-items table for an MVP checkout flow.
+  // customer_id is nullable to support guest checkout (like
+  // ticket_purchases uses buyer_name / buyer_email).
+  // ═══════════════════════════════════════════════════════════════
+
+  {
+    name: "025_create_merch_purchases",
+    sql: `
+      CREATE TABLE IF NOT EXISTS merch_purchases (
+        purchase_id      SERIAL PRIMARY KEY,
+        customer_id      INTEGER REFERENCES customers(customer_id),
+        buyer_name       VARCHAR(255) NOT NULL,
+        buyer_email      VARCHAR(255) NOT NULL,
+        shipping_address TEXT,
+        items            JSONB NOT NULL,
+        total_price      NUMERIC(10, 2) NOT NULL,
+        cardholder_name  VARCHAR(255),
+        card_last_four   VARCHAR(4),
+        purchase_date    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_merch_purchases_customer ON merch_purchases (customer_id);
+      CREATE INDEX IF NOT EXISTS idx_merch_purchases_date     ON merch_purchases (purchase_date);
+    `,
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION 12: MERCH PRESENTATION COLUMNS
+  // ═══════════════════════════════════════════════════════════════
+  // Adds image + description so merch can render like a real product
+  // on the customer-facing shop and in the admin table thumbnail.
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: "026_add_merch_presentation_columns",
+    sql: `
+      ALTER TABLE merch ADD COLUMN IF NOT EXISTS image_url   TEXT;
+      ALTER TABLE merch ADD COLUMN IF NOT EXISTS description TEXT;
+    `,
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION 13: DROP UNUSED ride_dispatch_queue
+  // ═══════════════════════════════════════════════════════════════
+  // The ride_dispatch_queue table was created in migration 012 as a
+  // placeholder for a guest queue feature that was never implemented.
+  // No route, service, trigger, or view references it. Safe to drop.
+  // ═══════════════════════════════════════════════════════════════
+  {
+    name: "027_drop_ride_dispatch_queue",
+    sql: `
+      DROP TABLE IF EXISTS ride_dispatch_queue;
     `,
   },
 ];

@@ -5,8 +5,27 @@ import { Link } from "react-router-dom"
 import CustomerNav from "../components/CustomerNav"
 import CustomerFooter from "../components/CustomerFooter"
 
+// Hero + per-ticket card images
+import heroImg         from "../assets/actions/buy-tickets.jpg"
+import imgSeasonPass   from "../assets/actions/season-pass.jpg"
+import imgRides        from "../assets/actions/rides.jpg"
+import imgVip          from "../assets/rides/hero-cougar-express.jpg"
+import imgFastPass     from "../assets/rides/hero-haunted-mansion.jpg"
+import imgChild        from "../assets/rides/bumper-cars.jpg"
+import imgSenior       from "../assets/rides/ferris-wheel.jpg"
+
 const f = "'DM Sans', sans-serif"
 const fh = "var(--font-heading)"
+
+// Per-ticket hero image. Falls back to a generic park photo.
+const TICKET_IMAGES = {
+  "General Admission": imgRides,
+  "Season Pass":       imgSeasonPass,
+  "VIP Experience":    imgVip,
+  "Fast Pass":         imgFastPass,
+  "Child (Under 12)":  imgChild,
+  "Senior (65+)":      imgSenior,
+}
 
 const ICONS = { "General Admission": "🎟️", "Season Pass": "⭐", "VIP Experience": "👑", "Fast Pass": "⚡", "Child (Under 12)": "🧒", "Senior (65+)": "👴" }
 const FEATURES = {
@@ -85,16 +104,14 @@ export default function TicketShop() {
     const today = new Date().toISOString().split("T")[0]
     const totalQty = getTotalQty()
 
-    if (!visitDate) {
-      return "Please select a visit date before proceeding"
-    }
-    if (visitDate < today) {
+    // Visit date is optional. Only validate if the user actually entered one.
+    if (visitDate && visitDate < today) {
       return "Visit date must be today or in the future"
     }
     if (totalQty <= 0) {
       return "Your cart must include at least one adult or child ticket"
     }
-    if (isDateParkClosed(visitDate)) {
+    if (visitDate && isDateParkClosed(visitDate)) {
       return `The park is closed on ${visitDate}. Please select a different date.`
     }
     return null
@@ -158,19 +175,23 @@ export default function TicketShop() {
       {/* Hero banner */}
       <div style={{
         paddingTop: "94px",
-        background: "linear-gradient(135deg, #0B1D3A 0%, #1a0a2e 50%, #0F0E0E 100%)",
         padding: "140px 2rem 4rem",
         textAlign: "center",
-        position: "relative", overflow: "hidden",
+        position: "relative",
+        overflow: "hidden",
+        backgroundImage: `linear-gradient(135deg, rgba(11,29,58,0.78), rgba(26,10,46,0.7), rgba(15,14,14,0.85)), url(${heroImg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
       }}>
         <div style={{
           position: "absolute", inset: 0,
-          background: "radial-gradient(ellipse at 30% 0%, rgba(200,16,46,0.15) 0%, transparent 60%)",
+          background: "radial-gradient(ellipse at 30% 0%, rgba(200,16,46,0.25) 0%, transparent 60%)",
+          pointerEvents: "none",
         }} />
         <div style={{ position: "relative", zIndex: 1 }}>
           <span style={{ fontFamily: f, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "3px", textTransform: "uppercase", color: "var(--cr-coral)" }}>Passes & Tickets</span>
-          <h1 style={{ fontFamily: fh, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "white", margin: "0.5rem 0 0.75rem" }}>Choose Your Adventure</h1>
-          <p style={{ fontFamily: f, fontSize: "0.95rem", color: "#777", maxWidth: "500px", margin: "0 auto" }}>
+          <h1 style={{ fontFamily: fh, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "white", margin: "0.5rem 0 0.75rem", textShadow: "0 2px 16px rgba(0,0,0,0.5)" }}>Choose Your Adventure</h1>
+          <p style={{ fontFamily: f, fontSize: "0.95rem", color: "rgba(255,255,255,0.85)", maxWidth: "500px", margin: "0 auto", textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
             All passes include full-day park access. Children under 3 enter free.
           </p>
         </div>
@@ -222,13 +243,22 @@ export default function TicketShop() {
                 <div key={t.id} style={{
                   background: "var(--cr-surface)", borderRadius: "16px",
                   border: t.id === POPULAR ? "2px solid var(--cr-red)" : "1px solid var(--cr-border)",
-                  padding: "2rem", display: "flex", flexDirection: "column",
+                  display: "flex", flexDirection: "column",
                   position: "relative", overflow: "hidden",
                   transition: "transform 0.3s var(--ease-out-expo), box-shadow 0.3s",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 40px rgba(0,0,0,0.4)" }}
                 onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none" }}
                 >
+                  {/* Ticket photo banner */}
+                  <div style={{
+                    height: "160px",
+                    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.35)), url(${TICKET_IMAGES[t.id] || imgRides})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    position: "relative",
+                  }} />
+
                   {/* Popular badge */}
                   {t.id === POPULAR && (
                     <div style={{
@@ -236,11 +266,11 @@ export default function TicketShop() {
                       background: "var(--cr-red)", color: "white",
                       fontFamily: f, fontSize: "0.6rem", fontWeight: 700,
                       padding: "4px 36px", textTransform: "uppercase", letterSpacing: "1px",
-                      transform: "rotate(35deg)",
+                      transform: "rotate(35deg)", zIndex: 2,
                     }}>Best Value</div>
                   )}
 
-                  <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>{t.icon}</div>
+                  <div style={{ padding: "1.75rem 2rem 2rem", display: "flex", flexDirection: "column", flex: 1 }}>
                   <h2 style={{ fontFamily: fh, fontSize: "1.3rem", fontWeight: 700, color: "#1a1a1a", margin: "0 0 0.3rem" }}>{t.id}</h2>
                   <p style={{ fontFamily: f, fontSize: "0.8rem", color: "#666", lineHeight: 1.5, margin: "0 0 1rem" }}>{t.desc}</p>
 
@@ -253,10 +283,11 @@ export default function TicketShop() {
                   </div>
 
                   <div style={{ marginTop: "auto" }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", marginBottom: "1rem" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "0.4rem 0.85rem", marginBottom: "1rem" }}>
                       <span style={{ fontFamily: fh, fontSize: "2rem", fontWeight: 800, color: "#111827" }}>${t.price}</span>
-                      <span style={{ fontFamily: f, fontSize: "0.75rem", color: "#999" }}>adult</span>
-                      <span style={{ fontFamily: f, fontSize: "0.75rem", color: "#bbb", marginLeft: "0.5rem" }}>${t.child} child</span>
+                      <span style={{ fontFamily: f, fontSize: "0.85rem", fontWeight: 600, color: "#555" }}>adult</span>
+                      <span style={{ fontFamily: fh, fontSize: "1.35rem", fontWeight: 700, color: "#111827" }}>${t.child}</span>
+                      <span style={{ fontFamily: f, fontSize: "0.85rem", fontWeight: 600, color: "#555" }}>child</span>
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem" }}>
                       <button onClick={() => addToCart(t.id, "adult_qty")} style={{
@@ -279,6 +310,7 @@ export default function TicketShop() {
                       >Add Child</button>
                     </div>
                   </div>
+                  </div> {/* /card body */}
                 </div>
               ))}
             </div>
@@ -364,11 +396,10 @@ export default function TicketShop() {
                 </div>
 
                 {/* Visit date */}
-                <div style={{ background: "var(--cr-surface)", borderRadius: "14px", border: `1px solid ${!visitDate || visitDate < new Date().toISOString().split("T")[0] || isDateParkClosed(visitDate) ? "var(--cr-red)" : "var(--cr-border)"}`, padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
-                  <label style={labelSt}>Visit Date <span style={{ color: "var(--cr-red)" }}>*</span></label>
+                <div style={{ background: "var(--cr-surface)", borderRadius: "14px", border: `1px solid ${visitDate && (visitDate < new Date().toISOString().split("T")[0] || isDateParkClosed(visitDate)) ? "var(--cr-red)" : "var(--cr-border)"}`, padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
+                  <label style={labelSt}>Visit Date <span style={{ color: "#999", fontSize: "0.7rem", fontWeight: 500 }}>(optional)</span></label>
                   <input type="date" value={visitDate} onChange={e => { setVisitDate(e.target.value); setError("") }}
                     min={new Date().toISOString().split("T")[0]}
-                    required
                     style={{ ...inputSt, width: "auto", colorScheme: "light" }} />
                   {visitDate && visitDate < new Date().toISOString().split("T")[0] && (
                     <p style={{ fontFamily: f, fontSize: "0.8rem", color: "#E53935", marginTop: "0.5rem", fontWeight: 600 }}>
@@ -382,7 +413,7 @@ export default function TicketShop() {
                   )}
                   {!visitDate && (
                     <p style={{ fontFamily: f, fontSize: "0.75rem", color: "#999", marginTop: "0.5rem" }}>
-                      Required — select the date you plan to visit the park
+                      Optional — pick a date if you already know when you'll visit
                     </p>
                   )}
                 </div>

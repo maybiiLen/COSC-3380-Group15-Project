@@ -592,74 +592,6 @@ function RidesSection({ initialZone }) {
 }
 
 // ────────────────────────────────────────────
-// MY PURCHASES — shown when logged in (WHITE THEME)
-// ────────────────────────────────────────────
-function PurchasesSection() {
-  const [purchases, setPurchases] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken")
-    if (!token) { setLoading(false); return }
-    fetch(`${API_BASE_URL}/api/tickets/my-purchases`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => res.json())
-      .then(data => { setPurchases(Array.isArray(data) ? data : []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
-
-  if (!localStorage.getItem("accessToken")) return null
-
-  return (
-    <div id="my-purchases" style={{ padding: "3rem 2rem", background: "var(--cr-bg)" }}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <div style={{ marginBottom: "1.5rem" }}>
-          <span style={{ fontFamily: f, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "3px", textTransform: "uppercase", color: "var(--cr-coral)" }}>Order History</span>
-          <h2 style={{ fontFamily: fh, fontSize: "clamp(1.5rem, 3vw, 2rem)", fontWeight: 800, color: "var(--cr-text)", margin: "0.4rem 0 0" }}>My Purchases</h2>
-        </div>
-
-        {loading ? (
-          <p style={{ textAlign: "center", color: "var(--cr-text-dim)", fontFamily: f }}>Loading...</p>
-        ) : purchases.length === 0 ? (
-          <div style={{
-            textAlign: "center", padding: "3rem",
-            background: "var(--cr-bg-alt)", borderRadius: "16px", border: "1px solid var(--cr-border)",
-          }}>
-            <p style={{ fontFamily: f, fontSize: "0.95rem", color: "var(--cr-text-dim)" }}>No purchases yet. Grab some tickets above! 🎢</p>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gap: "0.75rem" }}>
-            {purchases.map(p => (
-              <div key={p.purchase_id} style={{
-                background: "white", borderRadius: "14px",
-                padding: "1.25rem 1.5rem", border: "1px solid var(--cr-border)",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                flexWrap: "wrap", gap: "1rem",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-              }}>
-                <div>
-                  <h3 style={{ fontFamily: fh, fontSize: "1rem", fontWeight: 700, color: "var(--cr-text)", margin: "0 0 0.25rem" }}>{p.ticket_type}</h3>
-                  <p style={{ fontFamily: f, fontSize: "0.78rem", color: "var(--cr-text-dim)", margin: 0 }}>
-                    {p.adult_qty > 0 && `${p.adult_qty} adult${p.adult_qty > 1 ? "s" : ""}`}
-                    {p.adult_qty > 0 && p.child_qty > 0 && " · "}
-                    {p.child_qty > 0 && `${p.child_qty} child${p.child_qty > 1 ? "ren" : ""}`}
-                    {" · "}Purchased {new Date(p.purchase_date).toLocaleDateString()}
-                  </p>
-                </div>
-                <div style={{ fontFamily: fh, fontSize: "1.3rem", fontWeight: 700, color: "var(--cr-text)" }}>
-                  ${Number(p.total_price).toFixed(2)}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────
 // PLAN YOUR VISIT (WHITE THEME)
 // ────────────────────────────────────────────
 function PlanSection() {
@@ -684,14 +616,15 @@ function PlanSection() {
   }, [])
 
   const items = [
-    { icon: "🕐", title: "Park Hours", detail: "10 AM – 8 PM", sub: "Hours may vary by season" },
-    { icon: "🎢", title: "Rides", detail: `${counts.rides} Open`, sub: "Height requirements apply" },
-    { icon: "🍔", title: "Dining", detail: `${counts.restaurants} Restaurants`, sub: "Mobile ordering available" },
-    { icon: "🎯", title: "Games", detail: `${counts.games} Open`, sub: "Win prizes & souvenirs" },
-    { icon: "🎁", title: "Shopping", detail: `${counts.shops} Gift Shops`, sub: "Exclusive CougarRide merch" },
-    { icon: "🅿️", title: "Parking", detail: "Free Standard", sub: "Premium spots $15" },
-    { icon: "🛡️", title: "Safety", detail: "Daily Inspections", sub: "All rides certified" },
-    { icon: "📱", title: "Park App", detail: "Live Wait Times", sub: "Real-time updates" },
+    // Images chosen to match each button's description — no reuse of existing /assets photos.
+    { img: "https://images.unsplash.com/photo-1501139083538-0139583c060f?auto=format&fit=crop&w=600&q=70", title: "Park Hours",   detail: "10 AM – 8 PM",              sub: "Hours may vary by season" },
+    { img: "https://images.pexels.com/photos/1659740/pexels-photo-1659740.jpeg?auto=compress&cs=tinysrgb&w=600", title: "Rides",        detail: `${counts.rides} Open`,       sub: "Height requirements apply" },
+    { img: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=70", title: "Dining",       detail: `${counts.restaurants} Restaurants`, sub: "Mobile ordering available" },
+    { img: "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=600&q=70", title: "Games",        detail: `${counts.games} Open`,       sub: "Win prizes & souvenirs" },
+    { img: "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=600&q=70", title: "Shopping",     detail: `${counts.shops} Gift Shops`, sub: "Exclusive CougarRide merch" },
+    { img: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=70", title: "Parking",      detail: "Free Standard",             sub: "Premium spots $15" },
+    { img: "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952?auto=format&fit=crop&w=600&q=70", title: "Safety",       detail: "Daily Inspections",          sub: "All rides certified" },
+    { img: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=600&q=70", title: "Park App",     detail: "Live Wait Times",            sub: "Real-time updates" },
   ]
 
   return (
@@ -705,18 +638,32 @@ function PlanSection() {
           {items.map((item, i) => (
             <div key={i} style={{
               background: "white", borderRadius: "14px",
-              padding: "1.5rem", border: "1px solid var(--cr-border)",
-              textAlign: "center",
+              border: "1px solid var(--cr-border)",
+              overflow: "hidden",
               transition: "transform 0.3s var(--ease-out-expo), box-shadow 0.3s",
               boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
             }}
             onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.08)" }}
             onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)" }}
             >
-              <div style={{ fontSize: "1.8rem", marginBottom: "0.6rem" }}>{item.icon}</div>
-              <h3 style={{ fontFamily: f, fontSize: "0.65rem", fontWeight: 700, color: "var(--cr-text-faint)", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 0.4rem" }}>{item.title}</h3>
-              <div style={{ fontFamily: fh, fontSize: "1.05rem", fontWeight: 700, color: "var(--cr-text)", margin: "0 0 0.2rem" }}>{item.detail}</div>
-              <div style={{ fontFamily: f, fontSize: "0.72rem", color: "var(--cr-text-dim)" }}>{item.sub}</div>
+              <div style={{
+                position: "relative", height: "120px",
+                background: "linear-gradient(135deg, var(--cr-red), var(--cr-red-dark))",
+                overflow: "hidden",
+              }}>
+                <img
+                  src={item.img}
+                  alt={item.title}
+                  loading="lazy"
+                  onError={e => { e.currentTarget.style.display = "none" }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+              </div>
+              <div style={{ padding: "1.25rem", textAlign: "center" }}>
+                <h3 style={{ fontFamily: f, fontSize: "0.65rem", fontWeight: 700, color: "var(--cr-text-faint)", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 0.4rem" }}>{item.title}</h3>
+                <div style={{ fontFamily: fh, fontSize: "1.05rem", fontWeight: 700, color: "var(--cr-text)", margin: "0 0 0.2rem" }}>{item.detail}</div>
+                <div style={{ fontFamily: f, fontSize: "0.72rem", color: "var(--cr-text-dim)" }}>{item.sub}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -748,7 +695,6 @@ export default function CustomerLanding() {
       <div style={{ paddingTop: "94px" }}>
         <HeroSection />
         <WhatToDoSection />
-        <PurchasesSection />
         <ParkPromise />
         <PlanSection />
         <CustomerFooter />
@@ -763,17 +709,24 @@ export default function CustomerLanding() {
 function ParkPromise() {
   return (
     <div style={{
-      background: "linear-gradient(135deg, var(--cr-red) 0%, var(--cr-red-dark) 100%)",
-      padding: "5rem 2rem", textAlign: "center",
+      position: "relative",
+      padding: "6rem 2rem",
+      textAlign: "center",
+      backgroundImage: `linear-gradient(135deg, rgba(200,16,46,0.82) 0%, rgba(140,29,64,0.88) 60%, rgba(15,14,14,0.85) 100%), url(${heroImgWelcome})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundAttachment: "fixed",
     }}>
-      <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "800px", margin: "0 auto", position: "relative", zIndex: 1 }}>
         <h2 style={{
           fontFamily: "var(--font-heading)", fontSize: "clamp(2rem, 4vw, 3rem)",
           fontWeight: 900, color: "white", margin: "0 0 1.5rem", lineHeight: 1.1,
+          textShadow: "0 2px 20px rgba(0,0,0,0.45)",
         }}>More Than a Theme Park.<br />It's Where Memories Are Made.</h2>
         <p style={{
           fontFamily: "'DM Sans', sans-serif", fontSize: "1.1rem",
-          color: "rgba(255,255,255,0.8)", lineHeight: 1.7, margin: "0 0 2rem",
+          color: "rgba(255,255,255,0.9)", lineHeight: 1.7, margin: "0 0 2.5rem",
+          textShadow: "0 1px 10px rgba(0,0,0,0.35)",
         }}>
           From the moment you walk through our gates, every detail is designed to create unforgettable experiences.
           World-class rides, award-winning dining, live entertainment, and the warmest staff in the industry — all
@@ -787,8 +740,8 @@ function ParkPromise() {
             { num: "100%", label: "Fun Guaranteed" },
           ].map((s, i) => (
             <div key={i} style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: "var(--font-heading)", fontSize: "2.5rem", fontWeight: 900, color: "white" }}>{s.num}</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: "1px" }}>{s.label}</div>
+              <div style={{ fontFamily: "var(--font-heading)", fontSize: "2.5rem", fontWeight: 900, color: "white", textShadow: "0 2px 16px rgba(0,0,0,0.4)" }}>{s.num}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.8)", textTransform: "uppercase", letterSpacing: "1px", textShadow: "0 1px 8px rgba(0,0,0,0.3)" }}>{s.label}</div>
             </div>
           ))}
         </div>

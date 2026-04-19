@@ -3,10 +3,10 @@ import { useAuth } from "../context/AuthContext"
 import { API_BASE_URL } from "../utils/api"
 
 const TABS = [
-  { id: "restaurants", label: "Restaurants", icon: "🍔" },
-  { id: "gift-shops", label: "Gift Shops", icon: "🎁" },
-  { id: "games", label: "Games", icon: "🎯" },
-  { id: "merch", label: "Merchandise", icon: "🧸" },
+  { id: "restaurants", label: "Restaurants" },
+  { id: "gift-shops",  label: "Gift Shops" },
+  { id: "games",       label: "Games" },
+  { id: "merch",       label: "Merchandise" },
 ]
 
 export default function ParkOperations() {
@@ -74,7 +74,16 @@ export default function ParkOperations() {
     } else if (tab === "games") {
       setForm({ game_name: item.game_name, max_players: item.max_players, location: item.location, operational_status: item.operational_status, description: item.description || "", image_url: item.image_url || "", prize_type: item.prize_type || "" })
     } else {
-      setForm({ merch_name: item.merch_name, merch_category: item.merch_category, wholesale_price: item.wholesale_price, retail_price: item.retail_price, game_award: item.game_award, sold_location: item.sold_location })
+      setForm({
+        merch_name: item.merch_name,
+        merch_category: item.merch_category,
+        wholesale_price: item.wholesale_price,
+        retail_price: item.retail_price,
+        game_award: item.game_award,
+        sold_location: item.sold_location,
+        image_url: item.image_url || "",
+        description: item.description || "",
+      })
     }
   }
 
@@ -143,6 +152,16 @@ export default function ParkOperations() {
           This is a game prize (not sold directly)
         </label>
         <input placeholder="Sold Location" value={form.sold_location || ""} onChange={e => setForm({...form, sold_location: e.target.value})} className={inp} />
+        <textarea placeholder="Description" rows={2} value={form.description || ""} onChange={e => setForm({...form, description: e.target.value})} className={inp} />
+        <input placeholder="Image URL" value={form.image_url || ""} onChange={e => setForm({...form, image_url: e.target.value})} className={inp} />
+        {form.image_url && (
+          <img
+            src={form.image_url}
+            alt="Preview"
+            className="mt-1 rounded-lg h-32 w-full object-cover border border-gray-200"
+            onError={e => { e.currentTarget.style.display = "none" }}
+          />
+        )}
       </>
     )
   }
@@ -169,7 +188,7 @@ export default function ParkOperations() {
             className={`px-4 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors ${
               tab === t.id ? "bg-[#C8102E] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}>
-            {t.icon} {t.label}
+            {t.label}
           </button>
         ))}
       </div>
@@ -285,7 +304,19 @@ export default function ParkOperations() {
                 ))}
                 {tab === "merch" && data.map(m => (
                   <tr key={m.merch_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{m.merch_name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      <div className="flex items-center gap-2">
+                        {m.image_url && (
+                          <img
+                            src={m.image_url}
+                            alt=""
+                            className="w-9 h-9 rounded object-cover border border-gray-200"
+                            onError={e => { e.currentTarget.style.display = "none" }}
+                          />
+                        )}
+                        <span>{m.merch_name}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{m.merch_category}</td>
                     <td className="px-4 py-3 text-gray-600">${Number(m.wholesale_price || 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-gray-900">{m.game_award ? "—" : `$${Number(m.retail_price || 0).toFixed(2)}`}</td>

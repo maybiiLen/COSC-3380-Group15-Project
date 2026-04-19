@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { API_BASE_URL } from "../utils/api"
 import CustomerNav from "../components/CustomerNav"
 import CustomerFooter from "../components/CustomerFooter"
+import heroImg from "../assets/actions/games.jpg"
 
 const f = "'DM Sans', sans-serif"
 const fh = "var(--font-heading)"
@@ -31,10 +32,17 @@ export default function GamesPage() {
       <style>{`@keyframes fadeInUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }`}</style>
       <CustomerNav />
       <div style={{ paddingTop: "94px" }}>
-        <div style={{ background: "linear-gradient(135deg, #4A148C, #6A1B9A, #AB47BC)", padding: "4rem 2rem", textAlign: "center" }}>
-          <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>🎯</div>
-          <h1 style={{ fontFamily: fh, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "white", margin: "0 0 0.75rem" }}>Games & Entertainment</h1>
-          <p style={{ fontFamily: f, fontSize: "1rem", color: "rgba(255,255,255,0.85)", maxWidth: "600px", margin: "0 auto" }}>
+        <div style={{
+          position: "relative",
+          padding: "5rem 2rem",
+          textAlign: "center",
+          backgroundImage: `linear-gradient(135deg, rgba(74,20,140,0.72), rgba(106,27,154,0.65), rgba(15,14,14,0.78)), url(${heroImg})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          color: "white",
+        }}>
+          <h1 style={{ fontFamily: fh, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "white", margin: "0 0 0.75rem", textShadow: "0 2px 16px rgba(0,0,0,0.4)" }}>Games & Entertainment</h1>
+          <p style={{ fontFamily: f, fontSize: "1rem", color: "rgba(255,255,255,0.9)", maxWidth: "600px", margin: "0 auto", textShadow: "0 1px 8px rgba(0,0,0,0.3)" }}>
             {games.length} midway games · {openCount} currently open · Win prizes and take home memories!
           </p>
         </div>

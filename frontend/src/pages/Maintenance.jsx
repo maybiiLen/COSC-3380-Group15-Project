@@ -421,7 +421,7 @@ function ParkClosuresSection() {
         </div>
         <button onClick={() => setShowAdd(true)}
           className="flex items-center gap-1 px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer">
-          ⚠️ Create Zone Closure
+          Create Zone Closure
         </button>
       </div>
 
@@ -449,7 +449,7 @@ function ParkClosuresSection() {
               </select>
               <textarea placeholder="Reason for closure" required value={form.reason} onChange={e => setForm({...form, reason: e.target.value})}
                 className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#C8102E]" rows={3} />
-              <p className="text-xs text-red-500">⚠️ This will automatically close ALL rides in the selected zone and notify staff via the notification trigger.</p>
+              <p className="text-xs text-red-500">This will automatically close ALL rides in the selected zone and notify staff via the notification trigger.</p>
               <div className="flex gap-3 pt-2">
                 <button type="submit" className="flex-1 px-4 py-2.5 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer">Activate Closure</button>
                 <button type="button" onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Cancel</button>
@@ -502,7 +502,7 @@ function ParkClosuresSection() {
                   {c.is_active && (
                     <button onClick={() => handleLift(c.closure_id)}
                       className="text-green-600 hover:text-green-800 text-xs font-medium cursor-pointer">
-                      ✅ Lift Closure
+                      Lift Closure
                     </button>
                   )}
                 </td>

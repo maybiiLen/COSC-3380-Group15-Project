@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { API_BASE_URL } from "../utils/api"
 import CustomerNav from "../components/CustomerNav"
 import CustomerFooter from "../components/CustomerFooter"
+import heroImg from "../assets/actions/rides.jpg"
 
 const f = "'DM Sans', sans-serif"
 const fh = "var(--font-heading)"
@@ -52,14 +53,18 @@ export default function CustomerRidesPage() {
 
         {/* Hero */}
         <div style={{
-          background: "linear-gradient(135deg, #C8102E, #8C1D40, #0F0E0E)",
-          padding: "4rem 2rem", textAlign: "center",
+          position: "relative",
+          padding: "5rem 2rem",
+          textAlign: "center",
+          backgroundImage: `linear-gradient(135deg, rgba(200,16,46,0.72), rgba(140,29,64,0.65), rgba(15,14,14,0.8)), url(${heroImg})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          color: "white",
         }}>
-          <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>🎢</div>
-          <h1 style={{ fontFamily: fh, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "white", margin: "0 0 0.75rem" }}>
+          <h1 style={{ fontFamily: fh, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "white", margin: "0 0 0.75rem", textShadow: "0 2px 16px rgba(0,0,0,0.4)" }}>
             Rides & Attractions
           </h1>
-          <p style={{ fontFamily: f, fontSize: "1rem", color: "rgba(255,255,255,0.85)", maxWidth: "600px", margin: "0 auto" }}>
+          <p style={{ fontFamily: f, fontSize: "1rem", color: "rgba(255,255,255,0.9)", maxWidth: "600px", margin: "0 auto", textShadow: "0 1px 8px rgba(0,0,0,0.3)" }}>
             {rides.filter(r => r.status === "Operational").length} rides open today · {rides.length} total attractions across 4 themed zones
           </p>
         </div>
