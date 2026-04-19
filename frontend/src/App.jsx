@@ -15,6 +15,7 @@ import Rides from "./pages/Rides";
 import Staff from "./pages/Staff";
 import ParkOperations from "./pages/ParkOperations";
 import Maintenance from "./pages/Maintenance";
+import MyTasks from "./pages/MyTasks";
 import Analytics from "./pages/Analytics";
 import Notifications from "./pages/Notifications";
 
@@ -29,6 +30,7 @@ function DashboardLayout() {
           <Route path="/staff" element={<Staff />} />
           <Route path="/dining-shops" element={<ParkOperations />} />
           <Route path="/maintenance" element={<Maintenance />} />
+          <Route path="/my-tasks" element={<MyTasks />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/notifications" element={<Notifications />} />
         </Routes>

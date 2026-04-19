@@ -1,6 +1,13 @@
 const { Router } = require("../lib/router")
 const router = Router()
 const pool = require("../config/db")
+const verifyToken = require("../middleware/verifyToken")
+const verifyRole  = require("../middleware/verifyRole")
+
+// Restricts write actions (create/update/delete/archive) to managers + admins.
+// Staff users are intentionally locked out from editing maintenance requests —
+// they interact with their work via GET /my-tasks and PATCH /:id/mark-awaiting-review.
+const managerOrAdmin = [verifyToken, verifyRole("manager", "admin")]
 
 // ─── GET all maintenance requests (joined with ride + employee names) ───
 // DATA QUERY 1: JOIN maintenance_requests with rides and employees
@@ -92,8 +99,102 @@ router.get("/report/summary", async (req, res) => {
   }
 })
 
+// ─── GET my assigned tasks (staff view) ───
+// Returns active (non-completed, non-archived) maintenance requests assigned
+// to the currently-logged-in user. Used by the "My Tasks" page.
+router.get("/my-tasks", verifyToken, async (req, res) => {
+  try {
+    const { rows: empRows } = await pool.query(
+      "SELECT employee_id, full_name FROM employees WHERE user_id = $1 AND is_active = true",
+      [req.user.id]
+    )
+    if (empRows.length === 0) return res.json([])
+    const { employee_id } = empRows[0]
+
+    const { rows } = await pool.query(`
+      SELECT
+        m.request_id,
+        m.ride_id,
+        r.ride_name,
+        r.status AS ride_status,
+        m.description,
+        m.priority,
+        m.status,
+        m.created_at,
+        m.completed_at
+      FROM maintenance_requests m
+      JOIN rides r ON r.ride_id = m.ride_id
+      WHERE m.employee_id = $1
+        AND m.archived_at IS NULL
+        AND m.status IN ('Pending', 'In Progress', 'Awaiting Review')
+      ORDER BY
+        CASE m.priority
+          WHEN 'Critical' THEN 1
+          WHEN 'High'     THEN 2
+          WHEN 'Medium'   THEN 3
+          WHEN 'Low'      THEN 4
+          ELSE 5
+        END,
+        m.created_at DESC
+    `, [employee_id])
+
+    res.json(rows)
+  } catch (err) {
+    console.log("my-tasks error:", err.message)
+    res.status(500).json({ message: err.message })
+  }
+})
+
+// ─── PATCH mark a task as Awaiting Review (staff-facing "Mark Done" button) ───
+// Staff can only mark THEIR OWN assigned, non-completed tasks as Awaiting Review.
+// This transitions the request to a state where the manager must confirm before
+// it counts as Completed — ride remains Closed until the manager approves.
+router.patch("/:id/mark-awaiting-review", verifyToken, async (req, res) => {
+  const { id } = req.params
+  try {
+    const { rows: empRows } = await pool.query(
+      "SELECT employee_id FROM employees WHERE user_id = $1 AND is_active = true",
+      [req.user.id]
+    )
+    if (empRows.length === 0) {
+      return res.status(403).json({ message: "No active employee record for this user" })
+    }
+    const { employee_id } = empRows[0]
+
+    const { rows: reqRows } = await pool.query(
+      "SELECT employee_id, status, archived_at FROM maintenance_requests WHERE request_id = $1",
+      [id]
+    )
+    if (reqRows.length === 0) {
+      return res.status(404).json({ message: "Maintenance request not found" })
+    }
+    const r = reqRows[0]
+    if (r.archived_at) {
+      return res.status(409).json({ message: "Maintenance request is archived" })
+    }
+    if (r.employee_id !== employee_id) {
+      return res.status(403).json({ message: "This task is not assigned to you" })
+    }
+    if (!["Pending", "In Progress"].includes(r.status)) {
+      return res.status(400).json({
+        message: "Only Pending or In Progress tasks can be marked for review"
+      })
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE maintenance_requests SET status = 'Awaiting Review'
+       WHERE request_id = $1 RETURNING *`,
+      [id]
+    )
+    res.json({ message: "Task marked as Awaiting Review. A manager will confirm completion.", request: rows[0] })
+  } catch (err) {
+    console.log("mark-awaiting-review error:", err.message)
+    res.status(500).json({ message: err.message })
+  }
+})
+
 // ─── POST create a new maintenance request ───
-router.post("/", async (req, res) => {
+router.post("/", ...managerOrAdmin, async (req, res) => {
   const { ride_id, employee_id, description, priority, status } = req.body
 
   try {
@@ -127,7 +228,7 @@ router.post("/", async (req, res) => {
 })
 
 // ─── PUT update a maintenance request (status, priority, description) ───
-router.put("/:id", async (req, res) => {
+router.put("/:id", ...managerOrAdmin, async (req, res) => {
   const { id } = req.params
   const { status, priority, description, employee_id } = req.body
 
@@ -179,7 +280,7 @@ router.put("/:id", async (req, res) => {
 // Soft-delete: only Completed requests can be archived.
 // The row stays in the table so reports and audit trails still see it,
 // but it's hidden from the admin list and per-ride views.
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", ...managerOrAdmin, async (req, res) => {
   const { id } = req.params
 
   try {

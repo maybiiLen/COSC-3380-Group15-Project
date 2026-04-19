@@ -25,7 +25,8 @@ const BellIcon = (
 const navList = [
     { label: "Rides", icon: Ride, path: "/dashboard/rides", roles: ["staff", "manager", "admin"] },
     { label: "Dining & Shops", icon: Gift, path: "/dashboard/dining-shops", roles: ["staff", "manager", "admin"] },
-    { label: "Maintenance", icon: Maintenance, path: "/dashboard/maintenance", roles: ["staff", "manager", "admin"] },
+    { label: "My Tasks",    icon: Maintenance, path: "/dashboard/my-tasks",    roles: ["staff"] },
+    { label: "Maintenance", icon: Maintenance, path: "/dashboard/maintenance", roles: ["manager", "admin"] },
     { label: "Notifications", iconNode: BellIcon, path: "/dashboard/notifications", roles: ["staff", "manager", "admin"], showBadge: true },
     { label: "Reports", icon: Analytics, path: "/dashboard/analytics", roles: ["manager", "admin"] },
     { label: "Staff", icon: Staff, path: "/dashboard/staff", roles: ["admin"] },
