@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { API_BASE_URL } from "../utils/api"
+import { API_BASE_URL, authFetch } from "../utils/api"
 
 /**
  * Full-page Notifications inbox. Replaces the old sidebar dropdown bell.
@@ -24,10 +24,7 @@ export default function Notifications() {
     setLoading(true)
     setError("")
     try {
-      const token = localStorage.getItem("accessToken")
-      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await authFetch(`${API_BASE_URL}/api/notifications`)
       if (!res.ok) throw new Error("Failed to load notifications")
       setItems(await res.json())
     } catch (err) {
@@ -39,10 +36,8 @@ export default function Notifications() {
 
   async function markAsRead(id) {
     try {
-      const token = localStorage.getItem("accessToken")
-      const res = await fetch(`${API_BASE_URL}/api/notifications/${id}/read`, {
+      const res = await authFetch(`${API_BASE_URL}/api/notifications/${id}/read`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
         setItems(items.map(n => n.notification_id === id ? { ...n, is_read: true } : n))
@@ -52,10 +47,8 @@ export default function Notifications() {
 
   async function markAllRead() {
     try {
-      const token = localStorage.getItem("accessToken")
-      const res = await fetch(`${API_BASE_URL}/api/notifications/read-all`, {
+      const res = await authFetch(`${API_BASE_URL}/api/notifications/read-all`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) setItems(items.map(n => ({ ...n, is_read: true })))
     } catch {}
@@ -64,10 +57,8 @@ export default function Notifications() {
   async function deleteOne(id) {
     setBusy(true)
     try {
-      const token = localStorage.getItem("accessToken")
-      const res = await fetch(`${API_BASE_URL}/api/notifications/${id}`, {
+      const res = await authFetch(`${API_BASE_URL}/api/notifications/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
         setItems(items.filter(n => n.notification_id !== id))
@@ -86,10 +77,8 @@ export default function Notifications() {
   async function clearAll() {
     setBusy(true)
     try {
-      const token = localStorage.getItem("accessToken")
-      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+      const res = await authFetch(`${API_BASE_URL}/api/notifications`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
         setItems([])

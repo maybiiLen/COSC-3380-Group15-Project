@@ -12,7 +12,7 @@ import Analytics from './assets/analytics.svg';
 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { API_BASE_URL } from './utils/api';
+import { API_BASE_URL, authFetch } from './utils/api';
 
 // Inline bell icon used for the Notifications nav item — no asset file needed.
 const BellIcon = (
@@ -52,9 +52,7 @@ export default function Sidebar() {
             try {
                 const token = localStorage.getItem("accessToken")
                 if (!token) return
-                const res = await fetch(`${API_BASE_URL}/api/notifications/unread-count`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                })
+                const res = await authFetch(`${API_BASE_URL}/api/notifications/unread-count`)
                 if (res.ok) {
                     const data = await res.json()
                     setUnreadCount(data.count || 0)
