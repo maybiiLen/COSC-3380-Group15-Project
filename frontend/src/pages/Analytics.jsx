@@ -213,17 +213,28 @@ export default function Analytics() {
               </div>
             )}
 
-            {/* Date range — all reports */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Activity Date From</label>
-              <input type="date" value={filters.start_date} onChange={e => setFilters({...filters, start_date: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#C8102E]" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Activity Date To</label>
-              <input type="date" value={filters.end_date} onChange={e => setFilters({...filters, end_date: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#C8102E]" />
-            </div>
+            {/* Date range — label reflects what the date actually filters on for each report */}
+            {(() => {
+              const dateLabel =
+                selectedReport === 'maintenance'    ? 'Request Creation Date' :
+                selectedReport === 'ticketSales'    ? 'Ticket Purchased Date' :
+                selectedReport === 'rideOperations' ? 'Dispatch Date' :
+                'Date'
+              return (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{dateLabel} From</label>
+                    <input type="date" value={filters.start_date} onChange={e => setFilters({...filters, start_date: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#C8102E]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{dateLabel} To</label>
+                    <input type="date" value={filters.end_date} onChange={e => setFilters({...filters, end_date: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#C8102E]" />
+                  </div>
+                </>
+              )
+            })()}
           </div>
 
           {/* Action Buttons */}
@@ -442,18 +453,6 @@ function TicketSalesCharts({ data }) {
     return (data.byType || []).map(r => ({ name: r.ticket_type, value: Number(r.tickets_sold || 0) }))
   }, [data])
 
-  const topCustomers = useMemo(() => {
-    const m = new Map()
-    ;(data.details || []).forEach(d => {
-      const name = d.customer_name || 'Unknown'
-      m.set(name, (m.get(name) || 0) + Number(d.total_price || 0))
-    })
-    return [...m.entries()]
-      .map(([label, value]) => ({ label, value: Number(value.toFixed(2)) }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
-  }, [data])
-
   const revenueOverTime = useMemo(() => {
     const byDay = new Map()
     ;(data.details || []).forEach(d => {
@@ -465,6 +464,29 @@ function TicketSalesCharts({ data }) {
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .slice(-30)
       .map(([date, revenue]) => ({ date: date.slice(5), revenue: Number(revenue.toFixed(2)) }))
+  }, [data])
+
+  // Daily gate-demand forecast: adults + children by visit_date.
+  // This is the canonical theme-park operations analytic — ops, staffing,
+  // and ride queuing teams all work off a chart exactly like this.
+  const gateDemand = useMemo(() => {
+    const byDay = new Map()
+    ;(data.details || []).forEach(d => {
+      const k = (d.visit_date || '').slice(0, 10)
+      if (!k) return
+      const row = byDay.get(k) || { adults: 0, children: 0 }
+      row.adults   += Number(d.adult_qty || 0)
+      row.children += Number(d.child_qty || 0)
+      byDay.set(k, row)
+    })
+    return [...byDay.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .slice(-30)
+      .map(([date, { adults, children }]) => ({
+        date: date.slice(5),        // MM-DD
+        Adults: adults,
+        Children: children,
+      }))
   }, [data])
 
   return (
@@ -485,19 +507,22 @@ function TicketSalesCharts({ data }) {
           )}
         </ChartCard>
 
-        <ChartCard title="Top 10 Customers by Spend">
-          {topCustomers.length === 0 ? <ChartEmpty /> : (
+        <ChartCard title="Gate Demand by Visit Date (Adults + Children)">
+          {gateDemand.length === 0 ? <ChartEmpty /> : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topCustomers} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
-                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
-                <YAxis type="category" dataKey="label" tick={{ fill: AXIS_COLOR, fontSize: 11 }} width={120} />
+              <BarChart data={gateDemand} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: AXIS_COLOR, fontSize: 11 }} />
+                <YAxis tick={{ fill: AXIS_COLOR, fontSize: 11 }} allowDecimals={false} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[0, 6, 6, 0]} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="Adults"   stackId="a" fill={CHART_COLORS[0]} radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Children" stackId="a" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </ChartCard>
+
       </div>
 
       <div className="mb-6">
