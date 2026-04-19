@@ -10,7 +10,6 @@ async function resetAndSeed() {
 
     // Clear in dependency order (children first)
     await client.query("DELETE FROM dispatch_rejections");
-    await client.query("DELETE FROM ride_dispatch_queue");
     await client.query("DELETE FROM ride_dispatches");
     await client.query("DELETE FROM operator_assignments");
     await client.query("DELETE FROM notifications");

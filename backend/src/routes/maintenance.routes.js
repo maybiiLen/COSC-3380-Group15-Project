@@ -116,10 +116,15 @@ router.put("/:id", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE maintenance_requests
-       SET status      = COALESCE($1, status),
-           priority    = COALESCE($2, priority),
-           description = COALESCE($3, description),
-           employee_id = COALESCE($4, employee_id)
+       SET status       = COALESCE($1, status),
+           priority     = COALESCE($2, priority),
+           description  = COALESCE($3, description),
+           employee_id  = COALESCE($4, employee_id),
+           completed_at = CASE
+             WHEN LOWER(COALESCE($1, status)) = 'completed' AND completed_at IS NULL THEN NOW()
+             WHEN LOWER(COALESCE($1, status)) <> 'completed' THEN NULL
+             ELSE completed_at
+           END
        WHERE request_id = $5
        RETURNING *`,
       [status, priority, description, employee_id || null, id]
