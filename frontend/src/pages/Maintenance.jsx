@@ -251,10 +251,13 @@ export default function Maintenance() {
               Assigned Employee (optional)
               <select name="employee_id" value={formData.employee_id} onChange={handleChange} className={inputClass}>
                 <option value="">Unassigned</option>
-                {employees.map((emp) => (
-                  <option key={emp.employee_id} value={emp.employee_id}>{emp.full_name}</option>
-                ))}
+                {employees
+                  .filter((emp) => String(emp.role).toLowerCase() === "staff")
+                  .map((emp) => (
+                    <option key={emp.employee_id} value={emp.employee_id}>{emp.full_name}</option>
+                  ))}
               </select>
+              <span className="text-xs text-gray-500 font-normal">Only staff-role employees can be assigned maintenance work.</span>
             </div>
 
             <div className="flex flex-col gap-1.5 font-medium text-gray-700">

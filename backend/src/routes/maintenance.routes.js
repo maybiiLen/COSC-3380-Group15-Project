@@ -97,6 +97,22 @@ router.post("/", async (req, res) => {
   const { ride_id, employee_id, description, priority, status } = req.body
 
   try {
+    // Safety check: only staff-role employees can be assigned maintenance work.
+    if (employee_id) {
+      const { rows: empRows } = await pool.query(
+        "SELECT role FROM employees WHERE employee_id = $1",
+        [employee_id]
+      )
+      if (empRows.length === 0) {
+        return res.status(400).json({ message: "Assigned employee does not exist" })
+      }
+      if (String(empRows[0].role).toLowerCase() !== "staff") {
+        return res.status(400).json({
+          message: "Only staff-role employees can be assigned maintenance work. Managers and admins cannot be assigned."
+        })
+      }
+    }
+
     const { rows } = await pool.query(
       `INSERT INTO maintenance_requests (ride_id, employee_id, description, priority, status)
        VALUES ($1, $2, $3, $4, $5)
@@ -116,6 +132,22 @@ router.put("/:id", async (req, res) => {
   const { status, priority, description, employee_id } = req.body
 
   try {
+    // Safety check: only staff-role employees can be assigned maintenance work.
+    if (employee_id) {
+      const { rows: empRows } = await pool.query(
+        "SELECT role FROM employees WHERE employee_id = $1",
+        [employee_id]
+      )
+      if (empRows.length === 0) {
+        return res.status(400).json({ message: "Assigned employee does not exist" })
+      }
+      if (String(empRows[0].role).toLowerCase() !== "staff") {
+        return res.status(400).json({
+          message: "Only staff-role employees can be assigned maintenance work. Managers and admins cannot be assigned."
+        })
+      }
+    }
+
     const { rows } = await pool.query(
       `UPDATE maintenance_requests
        SET status       = COALESCE($1, status),
