@@ -86,7 +86,7 @@ export default function Maintenance() {
   async function handleSubmit() {
     try {
       if (editId) {
-        const res = await fetch(`${API_BASE_URL}/api/maintenance/${editId}`, {
+        const res = await authFetch(`${API_BASE_URL}/api/maintenance/${editId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData)
@@ -97,7 +97,7 @@ export default function Maintenance() {
           return
         }
       } else {
-        const res = await fetch(`${API_BASE_URL}/api/maintenance`, {
+        const res = await authFetch(`${API_BASE_URL}/api/maintenance`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData)
@@ -121,7 +121,7 @@ export default function Maintenance() {
 
   async function handleDelete() {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/maintenance/${deleteId}`, { method: "DELETE" })
+      const res = await authFetch(`${API_BASE_URL}/api/maintenance/${deleteId}`, { method: "DELETE" })
       if (!res.ok) {
         const data = await res.json()
         alert(data.message || "Failed to delete request")
